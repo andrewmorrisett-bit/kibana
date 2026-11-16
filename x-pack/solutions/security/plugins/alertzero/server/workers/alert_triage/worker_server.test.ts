@@ -5,19 +5,19 @@
  * 2.0.
  */
 
-import { getTriageLoadAlertsStepDefinition } from '../step_types/alert_triage/alert_triage_steps';
-import { WORKER_SERVER_DEFINITIONS } from '../workers';
-import { createWorkerServerContextMock } from '../workers/worker_server_context.mock';
-import { getTriageMatchFpDecisionsStepDefinition } from '../step_types/alert_triage/match_fp_decisions_step';
-import { getTriageStoreFpDecisionsStepDefinition } from '../step_types/alert_triage/store_fp_decisions_step';
+import { getTriageLoadAlertsStepDefinition } from './steps/alert_triage_steps';
+import { WORKER_SERVER_DEFINITIONS } from '..';
+import { createWorkerServerContextMock } from '../worker_server_context.mock';
+import { getTriageMatchFpDecisionsStepDefinition } from './steps/match_fp_decisions_step';
+import { getTriageStoreFpDecisionsStepDefinition } from './steps/store_fp_decisions_step';
 import {
   TRIAGE_DECISION_AUTO_CLOSE,
   TRIAGE_GROUPING_KILL_SWITCH,
   alertTriageServerDefinition,
 } from './worker_server';
 
-jest.mock('../step_types/alert_triage/store_fp_decisions_step', () => {
-  const actual = jest.requireActual('../step_types/alert_triage/store_fp_decisions_step');
+jest.mock('./steps/store_fp_decisions_step', () => {
+  const actual = jest.requireActual('./steps/store_fp_decisions_step');
   return {
     ...actual,
     getTriageStoreFpDecisionsStepDefinition: jest.fn(
@@ -26,8 +26,8 @@ jest.mock('../step_types/alert_triage/store_fp_decisions_step', () => {
   };
 });
 
-jest.mock('../step_types/alert_triage/match_fp_decisions_step', () => {
-  const actual = jest.requireActual('../step_types/alert_triage/match_fp_decisions_step');
+jest.mock('./steps/match_fp_decisions_step', () => {
+  const actual = jest.requireActual('./steps/match_fp_decisions_step');
   return {
     ...actual,
     getTriageMatchFpDecisionsStepDefinition: jest.fn(
@@ -36,8 +36,8 @@ jest.mock('../step_types/alert_triage/match_fp_decisions_step', () => {
   };
 });
 
-jest.mock('../step_types/alert_triage/alert_triage_steps', () => {
-  const actual = jest.requireActual('../step_types/alert_triage/alert_triage_steps');
+jest.mock('./steps/alert_triage_steps', () => {
+  const actual = jest.requireActual('./steps/alert_triage_steps');
   return {
     ...actual,
     getTriageLoadAlertsStepDefinition: jest.fn(actual.getTriageLoadAlertsStepDefinition),
