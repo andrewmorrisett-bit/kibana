@@ -6,8 +6,8 @@
  */
 
 import type {
-  CreateImportConfigData,
   FindImportConfigsSortField,
+  ImportConfigData,
   ImportConfigResponse,
 } from '@kbn/alerting-v2-schemas';
 import type { SavedObjectReference } from '@kbn/core/server';
@@ -17,9 +17,6 @@ import {
   type ImportConfigSavedObjectAttributes,
 } from '../../saved_objects';
 import type { Actor } from '../services/user_service/user_service';
-
-/** The fields of an import config that callers can set, without its id. */
-export type ImportConfigData = Omit<CreateImportConfigData, 'id'>;
 
 /** Builds the saved object references of an import config: one reference to its connector. */
 export const buildImportConfigReferences = (connectorId: string): SavedObjectReference[] => [

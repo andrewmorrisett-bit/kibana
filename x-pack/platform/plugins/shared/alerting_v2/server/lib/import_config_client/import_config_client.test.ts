@@ -35,6 +35,7 @@ const createData = (overrides: Partial<CreateImportConfigData> = {}): CreateImpo
     routing_tags: ['team-a'],
   },
   connector_id: 'connector-1',
+  type: 'datadog',
   ...overrides,
 });
 
@@ -91,7 +92,7 @@ describe('ImportConfigClient', () => {
   });
 
   describe('createImportConfig', () => {
-    it('stores the attributes and a connector reference, and returns the import', async () => {
+    it('stores the attributes without the type and a connector reference, and returns the import', async () => {
       savedObjectService.create.mockResolvedValue({ id: 'import-1', version: 'WzEsMV0=' });
 
       const result = await client.createImportConfig({ data: createData({ id: 'import-1' }) });

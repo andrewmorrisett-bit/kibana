@@ -11,6 +11,7 @@ import {
   FIND_DEFAULT_PER_PAGE,
   FIND_MAX_RESULT_WINDOW,
   ID_MAX_LENGTH,
+  IMPORT_CONFIG_TYPES,
   MAX_DESCRIPTION_LENGTH,
   MAX_NAME_LENGTH,
   MAX_PER_PAGE,
@@ -37,6 +38,14 @@ export const importConfigKindSchema = lazySchema(() =>
 );
 
 export type ImportConfigKind = z.infer<typeof importConfigKindSchema>;
+
+/** Type */
+
+export const importConfigTypeSchema = lazySchema(() =>
+  z.enum(IMPORT_CONFIG_TYPES).describe('The source the import receives events from.')
+);
+
+export type ImportConfigType = z.infer<typeof importConfigTypeSchema>;
 
 /** Metadata */
 
@@ -112,9 +121,19 @@ const importConfigDataBaseSchema = lazySchema(() =>
   })
 );
 
+/** The stored fields of an import config, which a PATCH is merged into and validated against. */
+export const importConfigDataSchema = lazySchema(() =>
+  importConfigDataBaseSchema.strict().refine(isRoutingTagsAllowedForKind, {
+    message: ROUTING_TAGS_KIND_MESSAGE,
+    path: ['metadata', 'routing_tags'],
+  })
+);
+
+export type ImportConfigData = z.infer<typeof importConfigDataSchema>;
+
 /**
  * Data accepted when creating an import config. The `id` is optional; when omitted, Kibana
- * generates one.
+ * generates one. The `type` is accepted but not stored.
  */
 export const createImportConfigDataSchema = lazySchema(() =>
   importConfigDataBaseSchema
@@ -124,6 +143,7 @@ export const createImportConfigDataSchema = lazySchema(() =>
         .describe(
           `The import ID. If omitted, Kibana generates one. If an import with this ID already exists, the request fails with a 409 error. ${ENTITY_ID_NOTE}`
         ),
+      type: importConfigTypeSchema,
     })
     .strict()
     .refine(isRoutingTagsAllowedForKind, {

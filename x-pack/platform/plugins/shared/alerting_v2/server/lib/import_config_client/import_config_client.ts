@@ -9,6 +9,7 @@ import Boom from '@hapi/boom';
 import type { ImportConfigResponse } from '@kbn/alerting-v2-schemas';
 import {
   createImportConfigDataSchema,
+  importConfigDataSchema,
   updateImportConfigDataSchema,
 } from '@kbn/alerting-v2-schemas';
 import { SavedObjectsErrorHelpers } from '@kbn/core-saved-objects-server';
@@ -82,7 +83,8 @@ export class ImportConfigClient {
 
   @withApm
   public async createImportConfig(params: CreateImportConfigParams): Promise<ImportConfigResponse> {
-    const { id, ...data } = this.parseImportConfigData(
+    // `type` is accepted on create but not stored yet.
+    const { id, type, ...data } = this.parseImportConfigData(
       createImportConfigDataSchema,
       params.data,
       'create'
@@ -136,16 +138,11 @@ export class ImportConfigClient {
     const connectorId = this.resolveConnectorId(existing);
 
     const merged = applyPatch(
-      createImportConfigDataSchema,
+      importConfigDataSchema,
       toImportConfigData(existing.attributes, connectorId),
       patch
     );
-    const {
-      kind,
-      metadata,
-      connector_id: mergedConnectorId,
-    } = this.parseImportConfigData(createImportConfigDataSchema, merged, 'update');
-    const data = { kind, metadata, connector_id: mergedConnectorId };
+    const data = this.parseImportConfigData(importConfigDataSchema, merged, 'update');
 
     const attributes = buildUpdateImportConfigAttributes({
       existing: existing.attributes,
