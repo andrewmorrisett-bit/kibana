@@ -23,9 +23,6 @@ export interface ImportConfigsApiService {
   cleanUp: () => Promise<void>;
 }
 
-const isNotFound = (error: unknown): boolean =>
-  (error as { status?: number } | undefined)?.status === 404;
-
 /**
  * Seeds import configs through the create route, which also creates their connectors, and
  * deletes them through the delete route so their connectors go too.
@@ -48,17 +45,13 @@ export const getImportConfigsApiService = ({
       return response.data;
     }),
 
+  // A find, not a get: the KbnClient retries a get that returns 404 several times.
   exists: (id) =>
     measurePerformanceAsync(log, 'importConfigs.exists', async () => {
-      try {
-        await kbnClient.savedObjects.get({ type: IMPORT_CONFIG_SAVED_OBJECT_TYPE, id });
-        return true;
-      } catch (error) {
-        if (isNotFound(error)) {
-          return false;
-        }
-        throw error;
-      }
+      const { saved_objects: savedObjects } = await kbnClient.savedObjects.find({
+        type: IMPORT_CONFIG_SAVED_OBJECT_TYPE,
+      });
+      return savedObjects.some((savedObject) => savedObject.id === id);
     }),
 
   cleanUp: () =>
