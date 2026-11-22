@@ -1,0 +1,136 @@
+/*
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
+ */
+
+import { expect } from '@kbn/scout/api';
+import {
+  ALERTING_V2_ALERTS_ALL_ROLE,
+  ALERTING_V2_ALERTS_READ_ROLE,
+  apiTest,
+  buildCreateImportConfigData,
+  getImportConfigUrl,
+  testData,
+} from '../fixtures';
+
+const buildPutData = (overrides: Parameters<typeof buildCreateImportConfigData>[0] = {}) => {
+  const { id, ...data } = buildCreateImportConfigData(overrides);
+  return data;
+};
+
+apiTest.describe('Upsert import config API', { tag: testData.API_ENGINE_TAG }, () => {
+  let writerHeaders: Record<string, string>;
+
+  apiTest.beforeAll(async ({ samlAuth }) => {
+    const { cookieHeader } = await samlAuth.asInteractiveUser(ALERTING_V2_ALERTS_ALL_ROLE);
+    writerHeaders = { ...cookieHeader, ...testData.COMMON_HEADERS };
+  });
+
+  apiTest.beforeEach(async ({ apiServices }) => {
+    await apiServices.alertingV2.importConfigs.cleanUp();
+  });
+
+  apiTest.afterAll(async ({ apiServices }) => {
+    await apiServices.alertingV2.importConfigs.cleanUp();
+  });
+
+  apiTest('should create the import at the given id', async ({ apiClient }) => {
+    const data = buildPutData();
+
+    const response = await apiClient.put(getImportConfigUrl('scout-import-upsert'), {
+      headers: writerHeaders,
+      body: data,
+    });
+
+    expect(response).toHaveStatusCode(201);
+    expect(response.body).toMatchObject({
+      id: 'scout-import-upsert',
+      kind: data.kind,
+      metadata: data.metadata,
+      connector_id: data.connector_id,
+      version: 1,
+    });
+    expect(Object.keys(response.body)).not.toContain('type');
+  });
+
+  apiTest('should replace an existing import', async ({ apiClient, apiServices }) => {
+    await apiServices.alertingV2.importConfigs.create(
+      buildCreateImportConfigData({
+        id: 'scout-import-upsert',
+        metadata: { name: 'Before replace', description: 'Dropped on replace', tags: ['old'] },
+      })
+    );
+
+    const response = await apiClient.put(getImportConfigUrl('scout-import-upsert'), {
+      headers: writerHeaders,
+      body: buildPutData({ kind: 'signal', metadata: { name: 'After replace' } }),
+    });
+
+    expect(response).toHaveStatusCode(200);
+    expect(response.body).toMatchObject({
+      id: 'scout-import-upsert',
+      kind: 'signal',
+      metadata: { name: 'After replace' },
+      version: 2,
+    });
+    expect(response.body.metadata.description).toBeUndefined();
+
+    const getResponse = await apiClient.get(getImportConfigUrl('scout-import-upsert'), {
+      headers: writerHeaders,
+    });
+    expect(getResponse.body).toStrictEqual(response.body);
+  });
+
+  apiTest(
+    'should return 400 when replacing an import with another connector',
+    async ({ apiClient, apiServices }) => {
+      await apiServices.alertingV2.importConfigs.create(
+        buildCreateImportConfigData({ id: 'scout-import-upsert' })
+      );
+
+      const response = await apiClient.put(getImportConfigUrl('scout-import-upsert'), {
+        headers: writerHeaders,
+        body: buildPutData({ connector_id: 'another-connector' }),
+      });
+
+      expect(response).toHaveStatusCode(400);
+      expect(response.body.code).toBe('INVALID_IMPORT_CONFIG_DATA');
+    }
+  );
+
+  apiTest('should return 400 when the type is missing', async ({ apiClient }) => {
+    const { type, ...withoutType } = buildPutData();
+
+    const response = await apiClient.put(getImportConfigUrl('scout-import-upsert'), {
+      headers: writerHeaders,
+      body: withoutType,
+    });
+
+    expect(response).toHaveStatusCode(400);
+  });
+
+  apiTest('should return 400 when the body has an id', async ({ apiClient }) => {
+    const response = await apiClient.put(getImportConfigUrl('scout-import-upsert'), {
+      headers: writerHeaders,
+      body: { ...buildPutData(), id: 'scout-import-upsert' },
+    });
+
+    expect(response).toHaveStatusCode(400);
+  });
+
+  apiTest(
+    'authorization: should return 403 for a user with read-only alerts privileges',
+    async ({ apiClient, samlAuth }) => {
+      const { cookieHeader } = await samlAuth.asInteractiveUser(ALERTING_V2_ALERTS_READ_ROLE);
+
+      const response = await apiClient.put(getImportConfigUrl('scout-import-upsert'), {
+        headers: { ...cookieHeader, ...testData.COMMON_HEADERS },
+        body: buildPutData(),
+      });
+
+      expect(response).toHaveStatusCode(403);
+    }
+  );
+});

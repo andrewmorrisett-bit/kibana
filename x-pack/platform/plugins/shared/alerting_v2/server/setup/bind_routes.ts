@@ -74,6 +74,7 @@ import { CreateImportConfigRoute } from '../routes/import_configs/create_import_
 import { DeleteImportConfigRoute } from '../routes/import_configs/delete_import_config_route';
 import { GetImportConfigRoute } from '../routes/import_configs/get_import_config_route';
 import { UpdateImportConfigRoute } from '../routes/import_configs/update_import_config_route';
+import { UpsertImportConfigRoute } from '../routes/import_configs/upsert_import_config_route';
 import { ListImportConfigsRoute } from '../routes/import_configs/list_import_configs_route';
 import { MatchActionPoliciesRoute } from '../routes/action_policies/match_action_policies_route';
 import { GetActionPolicyRoutingTagsRoute } from '../routes/action_policies/get_action_policy_routing_tags_route';
@@ -152,6 +153,7 @@ export function bindRoutes({ bind }: ContainerModuleLoadOptions) {
   bind(Route).toConstantValue(CreateImportConfigRoute);
   bind(Route).toConstantValue(GetImportConfigRoute);
   bind(Route).toConstantValue(UpdateImportConfigRoute);
+  bind(Route).toConstantValue(UpsertImportConfigRoute);
   bind(Route).toConstantValue(DeleteImportConfigRoute);
   bind(Route).toConstantValue(ListImportConfigsRoute);
   bind(Route).toConstantValue(MatchActionPoliciesRoute);

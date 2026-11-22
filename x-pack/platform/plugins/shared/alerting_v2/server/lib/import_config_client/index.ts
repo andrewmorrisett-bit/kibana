@@ -11,4 +11,5 @@ export type {
   FindImportConfigsParams,
   FindImportConfigsResponse,
   UpdateImportConfigParams,
+  UpsertImportConfigParams,
 } from './types';

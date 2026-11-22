@@ -7,6 +7,7 @@
 
 import {
   createImportConfigDataSchema,
+  putImportConfigDataSchema,
   updateImportConfigDataSchema,
 } from './import_config_data_schema';
 
@@ -60,5 +61,19 @@ describe('updateImportConfigDataSchema', () => {
     expect(updateImportConfigDataSchema.safeParse({ connector_id: 'connector-2' }).success).toBe(
       false
     );
+  });
+});
+
+describe('putImportConfigDataSchema', () => {
+  it('accepts a full import without an id', () => {
+    expect(putImportConfigDataSchema.safeParse(validCreateData).success).toBe(true);
+  });
+
+  it.each([
+    ['an id in the body', { ...validCreateData, id: 'import-1' }],
+    ['a missing type', { ...validCreateData, type: undefined }],
+    ['routing tags on a signal import', { ...validCreateData, kind: 'signal' }],
+  ])('rejects %s', (_, data) => {
+    expect(putImportConfigDataSchema.safeParse(data).success).toBe(false);
   });
 });

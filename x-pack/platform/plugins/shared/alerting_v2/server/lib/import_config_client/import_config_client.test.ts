@@ -406,6 +406,107 @@ describe('ImportConfigClient', () => {
     });
   });
 
+  describe('upsertImportConfig', () => {
+    const notFound = () =>
+      SavedObjectsErrorHelpers.createGenericNotFoundError(
+        IMPORT_CONFIG_SAVED_OBJECT_TYPE,
+        'import-1'
+      );
+
+    it('creates the import at the given id when it does not exist', async () => {
+      savedObjectService.get.mockRejectedValue(notFound());
+      savedObjectService.create.mockResolvedValue({ id: 'import-1', version: 'WzEsMV0=' });
+
+      const { importConfig, created } = await client.upsertImportConfig({
+        id: 'import-1',
+        data: createData(),
+      });
+
+      expect(created).toBe(true);
+      expect(savedObjectService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'import-1',
+          attrs: expect.not.objectContaining({ type: expect.anything() }),
+          references: [CONNECTOR_REFERENCE],
+        })
+      );
+      expect(importConfig).toEqual(expect.objectContaining({ id: 'import-1', version: 1 }));
+    });
+
+    it('replaces an existing import, increments the version and keeps the creation fields', async () => {
+      savedObjectService.get.mockResolvedValue(storedDoc());
+
+      const { importConfig, created } = await client.upsertImportConfig({
+        id: 'import-1',
+        data: createData({ kind: 'signal', metadata: { name: 'Replaced' } }),
+      });
+
+      expect(created).toBe(false);
+      expect(savedObjectService.create).not.toHaveBeenCalled();
+      expect(savedObjectService.update).toHaveBeenCalledWith({
+        id: 'import-1',
+        version: 'WzEsMV0=',
+        attrs: {
+          kind: 'signal',
+          metadata: { name: 'Replaced' },
+          connector_id: 'connector-1',
+          version: 4,
+          createdBy: CREATOR,
+          updatedBy: ACTOR,
+          createdAt: CREATED_AT,
+          updatedAt: NOW,
+        },
+        references: [CONNECTOR_REFERENCE],
+      });
+      expect(importConfig).toEqual(
+        expect.objectContaining({ id: 'import-1', kind: 'signal', version: 4 })
+      );
+    });
+
+    it('rejects a replace that changes the connector', async () => {
+      savedObjectService.get.mockResolvedValue(storedDoc());
+
+      const error = await client
+        .upsertImportConfig({ id: 'import-1', data: createData({ connector_id: 'connector-2' }) })
+        .catch((e) => e);
+
+      expect(error.output.statusCode).toBe(400);
+      expect(getBoomData(error)).toEqual({
+        code: ALERTING_ERROR_CODES.INVALID_IMPORT_CONFIG_DATA,
+        details: { import_config_id: 'import-1' },
+      });
+      expect(savedObjectService.update).not.toHaveBeenCalled();
+    });
+
+    it('throws INVALID_IMPORT_CONFIG_DATA before reading when the data fails validation', async () => {
+      const error = await client
+        .upsertImportConfig({ id: 'import-1', data: createData({ kind: 'signal' }) })
+        .catch((e) => e);
+
+      expect(getBoomData(error)).toEqual(
+        expect.objectContaining({
+          code: ALERTING_ERROR_CODES.INVALID_IMPORT_CONFIG_DATA,
+          details: expect.objectContaining({ context: 'upsert' }),
+        })
+      );
+      expect(savedObjectService.get).not.toHaveBeenCalled();
+    });
+
+    it('throws IMPORT_CONFIG_VERSION_CONFLICT when another writer updated the import', async () => {
+      savedObjectService.get.mockResolvedValue(storedDoc());
+      savedObjectService.update.mockRejectedValue(
+        SavedObjectsErrorHelpers.createConflictError(IMPORT_CONFIG_SAVED_OBJECT_TYPE, 'import-1')
+      );
+
+      const error = await client
+        .upsertImportConfig({ id: 'import-1', data: createData() })
+        .catch((e) => e);
+
+      expect(error.output.statusCode).toBe(409);
+      expect(getBoomData(error)?.code).toBe(ALERTING_ERROR_CODES.IMPORT_CONFIG_VERSION_CONFLICT);
+    });
+  });
+
   describe('deleteImportConfig', () => {
     it('deletes the import', async () => {
       await client.deleteImportConfig({ id: 'import-1' });

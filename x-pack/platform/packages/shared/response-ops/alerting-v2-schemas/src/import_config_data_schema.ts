@@ -156,6 +156,23 @@ export const createImportConfigDataSchema = lazySchema(() =>
 export type CreateImportConfigData = z.infer<typeof createImportConfigDataSchema>;
 
 /**
+ * Data accepted when creating or replacing an import config at a known ID. The ID comes from the
+ * path, and the `type` is accepted but not stored.
+ */
+export const putImportConfigDataSchema = lazySchema(() =>
+  importConfigDataBaseSchema
+    .extend({ type: importConfigTypeSchema })
+    .strict()
+    .refine(isRoutingTagsAllowedForKind, {
+      message: ROUTING_TAGS_KIND_MESSAGE,
+      path: ['metadata', 'routing_tags'],
+    })
+    .meta({ id: 'alerting_put_import_config' })
+);
+
+export type PutImportConfigData = z.infer<typeof putImportConfigDataSchema>;
+
+/**
  * Data accepted when updating an import config. Omitted fields are kept and `null` clears an
  * optional field. `connector_id` is not accepted: an import keeps the connector it was created
  * with.

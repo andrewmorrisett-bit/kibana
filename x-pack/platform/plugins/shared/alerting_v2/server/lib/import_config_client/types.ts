@@ -9,6 +9,7 @@ import type {
   CreateImportConfigData,
   FindImportConfigsSortField,
   ImportConfigResponse,
+  PutImportConfigData,
   UpdateImportConfigData,
 } from '@kbn/alerting-v2-schemas';
 
@@ -19,6 +20,11 @@ export interface CreateImportConfigParams {
 export interface UpdateImportConfigParams {
   id: string;
   data: UpdateImportConfigData;
+}
+
+export interface UpsertImportConfigParams {
+  id: string;
+  data: PutImportConfigData;
 }
 
 export interface FindImportConfigsParams {

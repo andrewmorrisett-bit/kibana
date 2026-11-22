@@ -11,5 +11,8 @@ export const IMPORT_CONFIG_NOT_FOUND_DESCRIPTION =
 export const IMPORT_CONFIG_ALREADY_EXISTS_DESCRIPTION =
   'Indicates an import with the given ID already exists.';
 
+export const IMPORT_CONFIG_UPSERT_CONFLICT_DESCRIPTION =
+  'Indicates the import was concurrently created or updated by another caller.';
+
 export const IMPORT_CONFIG_VERSION_CONFLICT_DESCRIPTION =
   'Indicates the import was concurrently updated by another caller.';

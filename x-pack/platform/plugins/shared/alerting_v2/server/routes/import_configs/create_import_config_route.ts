@@ -35,7 +35,7 @@ export class CreateImportConfigRoute extends BaseAlertingRoute {
     access: 'internal' as const,
     summary: 'Create an import',
     description:
-      'Creates an import. You can supply your own `id`; if you omit it, Kibana generates one. If an import with that `id` already exists, the request fails with HTTP 409 and the existing import is not changed.',
+      'Creates an import. You can supply your own `id`; if you omit it, Kibana generates one. If an import with that `id` already exists, the request fails with HTTP 409 and the existing import is not changed. To create or replace an import at a specific ID, use PUT /internal/alerting/v2/import_configs/{id}.',
   } as const;
   static schemas = {
     request: {

@@ -6,10 +6,11 @@
  */
 
 import Boom from '@hapi/boom';
-import type { ImportConfigResponse } from '@kbn/alerting-v2-schemas';
+import type { ImportConfigData, ImportConfigResponse } from '@kbn/alerting-v2-schemas';
 import {
   createImportConfigDataSchema,
   importConfigDataSchema,
+  putImportConfigDataSchema,
   updateImportConfigDataSchema,
 } from '@kbn/alerting-v2-schemas';
 import { SavedObjectsErrorHelpers } from '@kbn/core-saved-objects-server';
@@ -22,6 +23,7 @@ import { buildSoSearch } from '../build_so_search';
 import { ALERTING_ERROR_CODES, ALERTING_LOG_CODES } from '../errors/error_codes';
 import {
   getImportConfigAlreadyExistsMessage,
+  getImportConfigConnectorChangeMessage,
   getImportConfigNotFoundMessage,
   getImportConfigVersionConflictMessage,
   getInvalidImportConfigDataMessage,
@@ -36,13 +38,14 @@ import {
   LoggerServiceToken,
   type LoggerServiceContract,
 } from '../services/logger_service/logger_service';
-import type { UserServiceContract } from '../services/user_service/user_service';
+import type { Actor, UserServiceContract } from '../services/user_service/user_service';
 import { UserService } from '../services/user_service/user_service';
 import type {
   CreateImportConfigParams,
   FindImportConfigsParams,
   FindImportConfigsResponse,
   UpdateImportConfigParams,
+  UpsertImportConfigParams,
 } from './types';
 import {
   buildCreateImportConfigAttributes,
@@ -144,35 +147,42 @@ export class ImportConfigClient {
     );
     const data = this.parseImportConfigData(importConfigDataSchema, merged, 'update');
 
-    const attributes = buildUpdateImportConfigAttributes({
-      existing: existing.attributes,
-      data,
-      actor,
-      now: new Date().toISOString(),
-    });
+    return this.replaceImportConfig({ existing, data, actor });
+  }
 
-    try {
-      await this.importConfigSavedObjectService.update({
-        id: params.id,
-        attrs: attributes,
-        references: buildImportConfigReferences(data.connector_id),
-        version: existing.version,
+  /**
+   * Creates the import config at `id` when it does not exist, otherwise replaces it with `data`.
+   * Replacing cannot change the connector.
+   */
+  @withApm
+  public async upsertImportConfig(
+    params: UpsertImportConfigParams
+  ): Promise<{ importConfig: ImportConfigResponse; created: boolean }> {
+    // `type` is accepted on upsert but not stored yet.
+    const { type, ...data } = this.parseImportConfigData(
+      putImportConfigDataSchema,
+      params.data,
+      'upsert'
+    );
+    const existing = await this.findImportConfig(params.id);
+
+    if (!existing) {
+      const importConfig = await this.createImportConfig({
+        data: { ...data, type, id: params.id },
       });
-    } catch (e) {
-      if (SavedObjectsErrorHelpers.isConflictError(e)) {
-        throw Boom.conflict(getImportConfigVersionConflictMessage(params.id), {
-          code: ALERTING_ERROR_CODES.IMPORT_CONFIG_VERSION_CONFLICT,
-          details: { import_config_id: params.id },
-        });
-      }
-      throw e;
+      return { importConfig, created: true };
     }
 
-    return transformImportConfigToApiResponse({
-      id: params.id,
-      attributes,
-      connectorId: data.connector_id,
-    });
+    if (data.connector_id !== this.resolveConnectorId(existing)) {
+      throw Boom.badRequest(getImportConfigConnectorChangeMessage(params.id), {
+        code: ALERTING_ERROR_CODES.INVALID_IMPORT_CONFIG_DATA,
+        details: { import_config_id: params.id },
+      });
+    }
+
+    const actor = await this.userService.getCurrentActor();
+    const importConfig = await this.replaceImportConfig({ existing, data, actor });
+    return { importConfig, created: false };
   }
 
   @withApm
@@ -242,6 +252,59 @@ export class ImportConfigClient {
     } catch (e) {
       throw this.mapNotFound(id, e);
     }
+  }
+
+  /** Returns the import config, or `undefined` when it does not exist. */
+  private async findImportConfig(id: string): Promise<ImportConfigSavedObjectDoc | undefined> {
+    try {
+      return await this.importConfigSavedObjectService.get(id);
+    } catch (e) {
+      if (e instanceof Error && SavedObjectsErrorHelpers.isNotFoundError(e)) {
+        return undefined;
+      }
+      throw e;
+    }
+  }
+
+  /** Writes `data` over an existing import config, guarded by its saved object version. */
+  private async replaceImportConfig({
+    existing,
+    data,
+    actor,
+  }: {
+    existing: ImportConfigSavedObjectDoc;
+    data: ImportConfigData;
+    actor: Actor | null;
+  }): Promise<ImportConfigResponse> {
+    const attributes = buildUpdateImportConfigAttributes({
+      existing: existing.attributes,
+      data,
+      actor,
+      now: new Date().toISOString(),
+    });
+
+    try {
+      await this.importConfigSavedObjectService.update({
+        id: existing.id,
+        attrs: attributes,
+        references: buildImportConfigReferences(data.connector_id),
+        version: existing.version,
+      });
+    } catch (e) {
+      if (SavedObjectsErrorHelpers.isConflictError(e)) {
+        throw Boom.conflict(getImportConfigVersionConflictMessage(existing.id), {
+          code: ALERTING_ERROR_CODES.IMPORT_CONFIG_VERSION_CONFLICT,
+          details: { import_config_id: existing.id },
+        });
+      }
+      throw e;
+    }
+
+    return transformImportConfigToApiResponse({
+      id: existing.id,
+      attributes,
+      connectorId: data.connector_id,
+    });
   }
 
   private mapNotFound(id: string, e: unknown): unknown {

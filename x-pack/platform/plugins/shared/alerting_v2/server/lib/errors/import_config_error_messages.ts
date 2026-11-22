@@ -5,7 +5,7 @@
  * 2.0.
  */
 
-export type ImportConfigValidationContext = 'create' | 'update';
+export type ImportConfigValidationContext = 'create' | 'update' | 'upsert';
 
 export const getImportConfigNotFoundMessage = (id: string): string =>
   `Import config with ID "${id}" not found`;
@@ -15,6 +15,9 @@ export const getImportConfigAlreadyExistsMessage = (id: string): string =>
 
 export const getImportConfigVersionConflictMessage = (id: string): string =>
   `Import config with ID "${id}" has already been updated by another user`;
+
+export const getImportConfigConnectorChangeMessage = (id: string): string =>
+  `Import config with ID "${id}" cannot change its connector`;
 
 export const getInvalidImportConfigDataMessage = (
   context: ImportConfigValidationContext,
