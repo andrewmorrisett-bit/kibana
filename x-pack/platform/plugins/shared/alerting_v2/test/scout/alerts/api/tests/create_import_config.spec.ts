@@ -7,10 +7,12 @@
 
 import { expect } from '@kbn/scout/api';
 import {
-  ALERTING_V2_ALERTS_ALL_ROLE,
+  ALERTING_V2_ALERTS_AND_CONNECTORS_ALL_ROLE,
   ALERTING_V2_ALERTS_READ_ROLE,
+  ALERTING_V2_ALERTS_ALL_ROLE,
   apiTest,
   buildCreateImportConfigData,
+  getConnectorUrl,
   getImportConfigUrl,
   getListImportConfigsUrl,
   NO_ACCESS_ROLE,
@@ -21,7 +23,9 @@ apiTest.describe('Create import config API', { tag: testData.API_ENGINE_TAG }, (
   let writerHeaders: Record<string, string>;
 
   apiTest.beforeAll(async ({ samlAuth }) => {
-    const { cookieHeader } = await samlAuth.asInteractiveUser(ALERTING_V2_ALERTS_ALL_ROLE);
+    const { cookieHeader } = await samlAuth.asInteractiveUser(
+      ALERTING_V2_ALERTS_AND_CONNECTORS_ALL_ROLE
+    );
     writerHeaders = { ...cookieHeader, ...testData.COMMON_HEADERS };
   });
 
@@ -34,7 +38,7 @@ apiTest.describe('Create import config API', { tag: testData.API_ENGINE_TAG }, (
   });
 
   apiTest(
-    'should create an import with a generated id and not return the type',
+    'should create an import and a receive-only connector for it, without returning the type',
     async ({ apiClient }) => {
       const data = buildCreateImportConfigData();
 
@@ -48,7 +52,6 @@ apiTest.describe('Create import config API', { tag: testData.API_ENGINE_TAG }, (
       expect(response.body).toMatchObject({
         kind: data.kind,
         metadata: data.metadata,
-        connector_id: data.connector_id,
         version: 1,
       });
       expect(Object.keys(response.body)).not.toContain('type');
@@ -58,8 +61,27 @@ apiTest.describe('Create import config API', { tag: testData.API_ENGINE_TAG }, (
       });
       expect(getResponse).toHaveStatusCode(200);
       expect(getResponse.body).toStrictEqual(response.body);
+
+      const connectorResponse = await apiClient.get(getConnectorUrl(response.body.connector_id), {
+        headers: writerHeaders,
+      });
+      expect(connectorResponse).toHaveStatusCode(200);
+      expect(connectorResponse.body).toMatchObject({
+        connector_type_id: '.datadog',
+        name: data.metadata.name,
+        config: expect.objectContaining({ authType: 'none' }),
+      });
     }
   );
+
+  apiTest('should return 400 for a connector id in the body', async ({ apiClient }) => {
+    const response = await apiClient.post(getListImportConfigsUrl(), {
+      headers: writerHeaders,
+      body: { ...buildCreateImportConfigData(), connector_id: 'some-connector' },
+    });
+
+    expect(response).toHaveStatusCode(400);
+  });
 
   apiTest('should create an import with the supplied id', async ({ apiClient }) => {
     const response = await apiClient.post(getListImportConfigsUrl(), {
@@ -116,6 +138,25 @@ apiTest.describe('Create import config API', { tag: testData.API_ENGINE_TAG }, (
 
     expect(response).toHaveStatusCode(400);
   });
+
+  apiTest(
+    'authorization: should return 403 and create nothing for a user without connector privileges',
+    async ({ apiClient, samlAuth }) => {
+      const { cookieHeader } = await samlAuth.asInteractiveUser(ALERTING_V2_ALERTS_ALL_ROLE);
+
+      const response = await apiClient.post(getListImportConfigsUrl(), {
+        headers: { ...cookieHeader, ...testData.COMMON_HEADERS },
+        body: buildCreateImportConfigData({ id: 'scout-import-no-connectors' }),
+      });
+
+      expect(response).toHaveStatusCode(403);
+
+      const getResponse = await apiClient.get(getImportConfigUrl('scout-import-no-connectors'), {
+        headers: writerHeaders,
+      });
+      expect(getResponse).toHaveStatusCode(404);
+    }
+  );
 
   apiTest(
     'authorization: should return 403 for a user with read-only alerts privileges',

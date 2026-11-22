@@ -165,6 +165,9 @@ export const listRuleExecutionsUrl = (query?: ListRuleExecutionsQueryInput): str
   return `${RULE_EXECUTIONS_API_PATH}?${params.toString()}`;
 };
 
+export const getConnectorUrl = (id: string): string =>
+  `/api/actions/connector/${encodeURIComponent(id)}`;
+
 export const getImportConfigUrl = (id: string): string =>
   `${IMPORT_CONFIG_API_PATH}/${encodeURIComponent(id)}`;
 

@@ -21,6 +21,7 @@ import {
   ExecutionHistoryClientToken,
 } from '../lib/execution_history_client';
 import { ImportConfigClient } from '../lib/import_config_client';
+import { ImportConfigConnectorService } from '../lib/services/import_config_connector_service/import_config_connector_service';
 import { InternalRulesClient, InternalRulesClientProvider } from '../lib/internal_rules_client';
 import {
   createChangeHistoryClient,
@@ -53,6 +54,7 @@ export function bindClients({ bind }: ContainerModuleLoadOptions) {
   bind(ActionPolicyTestService).toSelf().inRequestScope();
   bind(RuleTemplatesClient).toSelf().inRequestScope();
   bind(ImportConfigClient).toSelf().inRequestScope();
+  bind(ImportConfigConnectorService).toSelf().inRequestScope();
   bind(ExecutionHistoryClient).toSelf().inRequestScope();
   bind(ExecutionHistoryClientToken).toService(ExecutionHistoryClient);
 

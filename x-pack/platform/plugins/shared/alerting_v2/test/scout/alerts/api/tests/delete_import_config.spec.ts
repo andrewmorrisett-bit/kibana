@@ -7,34 +7,38 @@
 
 import { expect } from '@kbn/scout/api';
 import {
-  ALERTING_V2_ALERTS_ALL_ROLE,
+  ALERTING_V2_ALERTS_AND_CONNECTORS_ALL_ROLE,
   ALERTING_V2_ALERTS_READ_ROLE,
   apiTest,
   buildCreateImportConfigData,
+  getConnectorUrl,
   getImportConfigUrl,
   testData,
 } from '../fixtures';
 
 apiTest.describe('Delete import config API', { tag: testData.API_ENGINE_TAG }, () => {
   let writerHeaders: Record<string, string>;
+  let connectorId: string;
 
   apiTest.beforeAll(async ({ samlAuth }) => {
-    const { cookieHeader } = await samlAuth.asInteractiveUser(ALERTING_V2_ALERTS_ALL_ROLE);
+    const { cookieHeader } = await samlAuth.asInteractiveUser(
+      ALERTING_V2_ALERTS_AND_CONNECTORS_ALL_ROLE
+    );
     writerHeaders = { ...cookieHeader, ...testData.COMMON_HEADERS };
   });
 
   apiTest.beforeEach(async ({ apiServices }) => {
     await apiServices.alertingV2.importConfigs.cleanUp();
-    await apiServices.alertingV2.importConfigs.create(
+    ({ connector_id: connectorId } = await apiServices.alertingV2.importConfigs.create(
       buildCreateImportConfigData({ id: 'scout-import-delete' })
-    );
+    ));
   });
 
   apiTest.afterAll(async ({ apiServices }) => {
     await apiServices.alertingV2.importConfigs.cleanUp();
   });
 
-  apiTest('should delete the import', async ({ apiClient }) => {
+  apiTest('should delete the import and its connector', async ({ apiClient }) => {
     const response = await apiClient.delete(getImportConfigUrl('scout-import-delete'), {
       headers: writerHeaders,
     });
@@ -45,6 +49,11 @@ apiTest.describe('Delete import config API', { tag: testData.API_ENGINE_TAG }, (
       headers: writerHeaders,
     });
     expect(getResponse).toHaveStatusCode(404);
+
+    const connectorResponse = await apiClient.get(getConnectorUrl(connectorId), {
+      headers: writerHeaders,
+    });
+    expect(connectorResponse).toHaveStatusCode(404);
   });
 
   apiTest('should return 404 when no import has that id', async ({ apiClient }) => {

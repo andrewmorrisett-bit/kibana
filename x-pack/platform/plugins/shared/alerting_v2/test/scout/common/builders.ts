@@ -113,7 +113,6 @@ export const buildCreateImportConfigData = (
 ): CreateImportConfigData => ({
   kind: 'alert',
   type: 'datadog',
-  connector_id: 'scout-datadog-connector',
   metadata: { name: 'Scout Datadog import', routing_tags: ['scout'] },
   ...input,
 });

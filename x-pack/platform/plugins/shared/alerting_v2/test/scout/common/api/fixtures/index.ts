@@ -43,6 +43,7 @@ export {
   ALERTING_V2_RULES_ALL_ROLE,
   ALERTING_V2_RULES_READ_ROLE,
   ALERTING_V2_ALERTS_ALL_ROLE,
+  ALERTING_V2_ALERTS_AND_CONNECTORS_ALL_ROLE,
   ALERTING_V2_ALERTS_READ_ROLE,
   ALERTING_V2_ACTION_POLICIES_ALL_ROLE,
   ALERTING_V2_ACTION_POLICIES_READ_ROLE,
@@ -109,6 +110,7 @@ export {
   getRuleTemplateTagsUrl,
   getRuleTemplateUrl,
   getInstallRuleTemplateUrl,
+  getConnectorUrl,
   getImportConfigUrl,
   getListImportConfigsUrl,
 } from '../../urls';

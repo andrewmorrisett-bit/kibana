@@ -7,7 +7,7 @@
 
 import { expect } from '@kbn/scout/api';
 import {
-  ALERTING_V2_ALERTS_ALL_ROLE,
+  ALERTING_V2_ALERTS_AND_CONNECTORS_ALL_ROLE,
   ALERTING_V2_ALERTS_READ_ROLE,
   apiTest,
   buildCreateImportConfigData,
@@ -24,7 +24,9 @@ apiTest.describe('Upsert import config API', { tag: testData.API_ENGINE_TAG }, (
   let writerHeaders: Record<string, string>;
 
   apiTest.beforeAll(async ({ samlAuth }) => {
-    const { cookieHeader } = await samlAuth.asInteractiveUser(ALERTING_V2_ALERTS_ALL_ROLE);
+    const { cookieHeader } = await samlAuth.asInteractiveUser(
+      ALERTING_V2_ALERTS_AND_CONNECTORS_ALL_ROLE
+    );
     writerHeaders = { ...cookieHeader, ...testData.COMMON_HEADERS };
   });
 
@@ -49,56 +51,51 @@ apiTest.describe('Upsert import config API', { tag: testData.API_ENGINE_TAG }, (
       id: 'scout-import-upsert',
       kind: data.kind,
       metadata: data.metadata,
-      connector_id: data.connector_id,
       version: 1,
     });
     expect(Object.keys(response.body)).not.toContain('type');
   });
 
-  apiTest('should replace an existing import', async ({ apiClient, apiServices }) => {
-    await apiServices.alertingV2.importConfigs.create(
-      buildCreateImportConfigData({
-        id: 'scout-import-upsert',
-        metadata: { name: 'Before replace', description: 'Dropped on replace', tags: ['old'] },
-      })
-    );
-
-    const response = await apiClient.put(getImportConfigUrl('scout-import-upsert'), {
-      headers: writerHeaders,
-      body: buildPutData({ kind: 'signal', metadata: { name: 'After replace' } }),
-    });
-
-    expect(response).toHaveStatusCode(200);
-    expect(response.body).toMatchObject({
-      id: 'scout-import-upsert',
-      kind: 'signal',
-      metadata: { name: 'After replace' },
-      version: 2,
-    });
-    expect(response.body.metadata.description).toBeUndefined();
-
-    const getResponse = await apiClient.get(getImportConfigUrl('scout-import-upsert'), {
-      headers: writerHeaders,
-    });
-    expect(getResponse.body).toStrictEqual(response.body);
-  });
-
   apiTest(
-    'should return 400 when replacing an import with another connector',
+    'should replace an existing import and keep its connector',
     async ({ apiClient, apiServices }) => {
-      await apiServices.alertingV2.importConfigs.create(
-        buildCreateImportConfigData({ id: 'scout-import-upsert' })
+      const existing = await apiServices.alertingV2.importConfigs.create(
+        buildCreateImportConfigData({
+          id: 'scout-import-upsert',
+          metadata: { name: 'Before replace', description: 'Dropped on replace', tags: ['old'] },
+        })
       );
 
       const response = await apiClient.put(getImportConfigUrl('scout-import-upsert'), {
         headers: writerHeaders,
-        body: buildPutData({ connector_id: 'another-connector' }),
+        body: buildPutData({ kind: 'signal', metadata: { name: 'After replace' } }),
       });
 
-      expect(response).toHaveStatusCode(400);
-      expect(response.body.code).toBe('INVALID_IMPORT_CONFIG_DATA');
+      expect(response).toHaveStatusCode(200);
+      expect(response.body).toMatchObject({
+        id: 'scout-import-upsert',
+        kind: 'signal',
+        metadata: { name: 'After replace' },
+        connector_id: existing.connector_id,
+        version: 2,
+      });
+      expect(response.body.metadata.description).toBeUndefined();
+
+      const getResponse = await apiClient.get(getImportConfigUrl('scout-import-upsert'), {
+        headers: writerHeaders,
+      });
+      expect(getResponse.body).toStrictEqual(response.body);
     }
   );
+
+  apiTest('should return 400 for a connector id in the body', async ({ apiClient }) => {
+    const response = await apiClient.put(getImportConfigUrl('scout-import-upsert'), {
+      headers: writerHeaders,
+      body: { ...buildPutData(), connector_id: 'some-connector' },
+    });
+
+    expect(response).toHaveStatusCode(400);
+  });
 
   apiTest('should return 400 when the type is missing', async ({ apiClient }) => {
     const { type, ...withoutType } = buildPutData();

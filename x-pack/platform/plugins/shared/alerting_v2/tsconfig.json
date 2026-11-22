@@ -15,6 +15,8 @@
     "test/scout_alerting_v2_custom_config/**/*"
   ],
   "kbn_references": [
+    "@kbn/connector-specs",
+    "@kbn/actions-plugin",
     "@kbn/agent-builder-elastic-ai-index-ki-types",
     "@kbn/core",
     "@kbn/task-manager-plugin",

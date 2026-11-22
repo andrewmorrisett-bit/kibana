@@ -16,6 +16,10 @@ import {
   type ImportConfigSavedObjectServiceMock,
 } from '../services/import_config_saved_object_service/import_config_saved_object_service.mock';
 import type { ImportConfigSavedObjectDoc } from '../services/import_config_saved_object_service/types';
+import {
+  createImportConfigConnectorServiceMock,
+  type ImportConfigConnectorServiceMock,
+} from '../services/import_config_connector_service/import_config_connector_service.mock';
 import { createLoggerService } from '../services/logger_service/logger_service.mock';
 import { createUserService } from '../services/user_service/user_service.mock';
 import { ImportConfigClient } from './import_config_client';
@@ -34,7 +38,6 @@ const createData = (overrides: Partial<CreateImportConfigData> = {}): CreateImpo
     tags: ['datadog'],
     routing_tags: ['team-a'],
   },
-  connector_id: 'connector-1',
   type: 'datadog',
   ...overrides,
 });
@@ -72,17 +75,20 @@ const getBoomData = (error: unknown) => (Boom.isBoom(error) ? error.data : undef
 
 describe('ImportConfigClient', () => {
   let savedObjectService: ImportConfigSavedObjectServiceMock;
+  let connectorService: ImportConfigConnectorServiceMock;
   let mockLogger: ReturnType<typeof createLoggerService>['mockLogger'];
   let client: ImportConfigClient;
 
   beforeEach(() => {
     jest.useFakeTimers().setSystemTime(new Date(NOW));
     savedObjectService = createImportConfigSavedObjectServiceMock();
+    connectorService = createImportConfigConnectorServiceMock();
     const logger = createLoggerService();
     mockLogger = logger.mockLogger;
     client = new ImportConfigClient(
       savedObjectService,
       createUserService().userService,
+      connectorService,
       logger.loggerService
     );
   });
@@ -92,10 +98,15 @@ describe('ImportConfigClient', () => {
   });
 
   describe('createImportConfig', () => {
-    it('stores the attributes without the type and a connector reference, and returns the import', async () => {
+    it('creates a connector from the type and stores it with the attributes, without the type', async () => {
       savedObjectService.create.mockResolvedValue({ id: 'import-1', version: 'WzEsMV0=' });
 
       const result = await client.createImportConfig({ data: createData({ id: 'import-1' }) });
+
+      expect(connectorService.create).toHaveBeenCalledWith({
+        type: 'datadog',
+        name: 'Datadog production',
+      });
 
       expect(savedObjectService.create).toHaveBeenCalledWith({
         id: 'import-1',
@@ -151,7 +162,7 @@ describe('ImportConfigClient', () => {
       expect(result.metadata).toEqual({ name: 'Signals only' });
     });
 
-    it('throws IMPORT_CONFIG_ALREADY_EXISTS when the id is taken', async () => {
+    it('throws IMPORT_CONFIG_ALREADY_EXISTS and deletes the new connector when the id is taken', async () => {
       savedObjectService.create.mockRejectedValue(
         SavedObjectsErrorHelpers.createConflictError(IMPORT_CONFIG_SAVED_OBJECT_TYPE, 'import-1')
       );
@@ -159,6 +170,8 @@ describe('ImportConfigClient', () => {
       const error = await client
         .createImportConfig({ data: createData({ id: 'import-1' }) })
         .catch((e) => e);
+
+      expect(connectorService.delete).toHaveBeenCalledWith('connector-1');
 
       expect(error.output.statusCode).toBe(409);
       expect(getBoomData(error)).toEqual({
@@ -170,7 +183,7 @@ describe('ImportConfigClient', () => {
     it('throws INVALID_IMPORT_CONFIG_DATA when the data fails validation', async () => {
       const error = await client
         .createImportConfig({
-          data: { ...createData(), connector_id: '' },
+          data: { ...createData(), type: 'pagerduty' as never },
         })
         .catch((e) => e);
 
@@ -181,7 +194,33 @@ describe('ImportConfigClient', () => {
           details: expect.objectContaining({ context: 'create' }),
         })
       );
+      expect(connectorService.create).not.toHaveBeenCalled();
       expect(savedObjectService.create).not.toHaveBeenCalled();
+    });
+
+    it('does not create the import when the connector cannot be created', async () => {
+      const failure = new Error('Unauthorized to create connectors');
+      connectorService.create.mockRejectedValue(failure);
+
+      await expect(client.createImportConfig({ data: createData() })).rejects.toBe(failure);
+      expect(savedObjectService.create).not.toHaveBeenCalled();
+    });
+
+    it('logs and keeps the saved object error when the new connector cannot be deleted', async () => {
+      const failure = new Error('cluster unavailable');
+      savedObjectService.create.mockRejectedValue(failure);
+      connectorService.delete.mockRejectedValue(new Error('connector delete failed'));
+
+      await expect(client.createImportConfig({ data: createData() })).rejects.toBe(failure);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          labels: expect.objectContaining({
+            code: ALERTING_LOG_CODES.IMPORT_CONFIG_CONNECTOR_DELETE_FAILED,
+            connector_id: 'connector-1',
+          }),
+        })
+      );
     });
 
     it('rejects routing tags on a signal import', async () => {
@@ -423,6 +462,10 @@ describe('ImportConfigClient', () => {
       });
 
       expect(created).toBe(true);
+      expect(connectorService.create).toHaveBeenCalledWith({
+        type: 'datadog',
+        name: 'Datadog production',
+      });
       expect(savedObjectService.create).toHaveBeenCalledWith(
         expect.objectContaining({
           id: 'import-1',
@@ -442,6 +485,7 @@ describe('ImportConfigClient', () => {
       });
 
       expect(created).toBe(false);
+      expect(connectorService.create).not.toHaveBeenCalled();
       expect(savedObjectService.create).not.toHaveBeenCalled();
       expect(savedObjectService.update).toHaveBeenCalledWith({
         id: 'import-1',
@@ -461,21 +505,6 @@ describe('ImportConfigClient', () => {
       expect(importConfig).toEqual(
         expect.objectContaining({ id: 'import-1', kind: 'signal', version: 4 })
       );
-    });
-
-    it('rejects a replace that changes the connector', async () => {
-      savedObjectService.get.mockResolvedValue(storedDoc());
-
-      const error = await client
-        .upsertImportConfig({ id: 'import-1', data: createData({ connector_id: 'connector-2' }) })
-        .catch((e) => e);
-
-      expect(error.output.statusCode).toBe(400);
-      expect(getBoomData(error)).toEqual({
-        code: ALERTING_ERROR_CODES.INVALID_IMPORT_CONFIG_DATA,
-        details: { import_config_id: 'import-1' },
-      });
-      expect(savedObjectService.update).not.toHaveBeenCalled();
     });
 
     it('throws INVALID_IMPORT_CONFIG_DATA before reading when the data fails validation', async () => {
@@ -508,14 +537,45 @@ describe('ImportConfigClient', () => {
   });
 
   describe('deleteImportConfig', () => {
-    it('deletes the import', async () => {
+    it('deletes the import and then its connector', async () => {
+      savedObjectService.get.mockResolvedValue(storedDoc());
+
       await client.deleteImportConfig({ id: 'import-1' });
 
       expect(savedObjectService.delete).toHaveBeenCalledWith({ id: 'import-1' });
+      expect(connectorService.delete).toHaveBeenCalledWith('connector-1');
+    });
+
+    it('keeps the connector when the import cannot be deleted', async () => {
+      const failure = new Error('cluster unavailable');
+      savedObjectService.get.mockResolvedValue(storedDoc());
+      savedObjectService.delete.mockRejectedValue(failure);
+
+      await expect(client.deleteImportConfig({ id: 'import-1' })).rejects.toBe(failure);
+      expect(connectorService.delete).not.toHaveBeenCalled();
+    });
+
+    it('still deletes the import and logs when its connector cannot be deleted', async () => {
+      savedObjectService.get.mockResolvedValue(storedDoc());
+      connectorService.delete.mockRejectedValue(new Error('connector delete failed'));
+
+      await client.deleteImportConfig({ id: 'import-1' });
+
+      expect(savedObjectService.delete).toHaveBeenCalledWith({ id: 'import-1' });
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          labels: expect.objectContaining({
+            code: ALERTING_LOG_CODES.IMPORT_CONFIG_CONNECTOR_DELETE_FAILED,
+            connector_id: 'connector-1',
+            import_config_id: 'import-1',
+          }),
+        })
+      );
     });
 
     it('throws IMPORT_CONFIG_NOT_FOUND when the import does not exist', async () => {
-      savedObjectService.delete.mockRejectedValue(
+      savedObjectService.get.mockRejectedValue(
         SavedObjectsErrorHelpers.createGenericNotFoundError(
           IMPORT_CONFIG_SAVED_OBJECT_TYPE,
           'missing'

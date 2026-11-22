@@ -23,12 +23,15 @@ import { buildSoSearch } from '../build_so_search';
 import { ALERTING_ERROR_CODES, ALERTING_LOG_CODES } from '../errors/error_codes';
 import {
   getImportConfigAlreadyExistsMessage,
-  getImportConfigConnectorChangeMessage,
   getImportConfigNotFoundMessage,
   getImportConfigVersionConflictMessage,
   getInvalidImportConfigDataMessage,
   type ImportConfigValidationContext,
 } from '../errors/import_config_error_messages';
+import {
+  ImportConfigConnectorService,
+  type ImportConfigConnectorServiceContract,
+} from '../services/import_config_connector_service/import_config_connector_service';
 import { ImportConfigSavedObjectServiceScopedToken } from '../services/import_config_saved_object_service/tokens';
 import type {
   ImportConfigSavedObjectDoc,
@@ -66,6 +69,9 @@ const DEFAULT_PER_PAGE = 20;
  * CRUD for alert import configs: the configuration of one source of external alerts, such as a
  * Datadog connector that receives events.
  *
+ * Creating an import creates its connector, with no authentication, from the import `type`.
+ * Deleting an import deletes its connector. The connector never changes in between.
+ *
  * The connector is stored twice: as the `connector_id` attribute and as a `connector` saved object
  * reference. Every write sets both. Every read takes the connector id from the reference, which
  * saved object import and copy to space keep up to date, and falls back to the attribute only when
@@ -79,6 +85,8 @@ export class ImportConfigClient {
     @inject(ImportConfigSavedObjectServiceScopedToken)
     private readonly importConfigSavedObjectService: ImportConfigSavedObjectServiceContract,
     @inject(UserService) private readonly userService: UserServiceContract,
+    @inject(ImportConfigConnectorService)
+    private readonly connectorService: ImportConfigConnectorServiceContract,
     @inject(LoggerServiceToken) loggerService: LoggerServiceContract
   ) {
     this.logger = loggerService.forSubsystem('importConfigClient');
@@ -86,15 +94,16 @@ export class ImportConfigClient {
 
   @withApm
   public async createImportConfig(params: CreateImportConfigParams): Promise<ImportConfigResponse> {
-    // `type` is accepted on create but not stored yet.
     const { id, type, ...data } = this.parseImportConfigData(
       createImportConfigDataSchema,
       params.data,
       'create'
     );
     const actor = await this.userService.getCurrentActor();
+    const connectorId = await this.connectorService.create({ type, name: data.metadata.name });
     const attributes = buildCreateImportConfigAttributes({
       data,
+      connectorId,
       actor,
       now: new Date().toISOString(),
     });
@@ -103,10 +112,11 @@ export class ImportConfigClient {
     try {
       ({ id: createdId } = await this.importConfigSavedObjectService.create({
         attrs: attributes,
-        references: buildImportConfigReferences(data.connector_id),
+        references: buildImportConfigReferences(connectorId),
         id,
       }));
     } catch (e) {
+      await this.deleteConnectorQuietly(connectorId, id);
       if (id && SavedObjectsErrorHelpers.isConflictError(e)) {
         throw Boom.conflict(getImportConfigAlreadyExistsMessage(id), {
           code: ALERTING_ERROR_CODES.IMPORT_CONFIG_ALREADY_EXISTS,
@@ -119,7 +129,7 @@ export class ImportConfigClient {
     return transformImportConfigToApiResponse({
       id: createdId,
       attributes,
-      connectorId: data.connector_id,
+      connectorId,
     });
   }
 
@@ -138,11 +148,10 @@ export class ImportConfigClient {
     const patch = this.parseImportConfigData(updateImportConfigDataSchema, params.data, 'update');
     const actor = await this.userService.getCurrentActor();
     const existing = await this.getExistingImportConfig(params.id);
-    const connectorId = this.resolveConnectorId(existing);
 
     const merged = applyPatch(
       importConfigDataSchema,
-      toImportConfigData(existing.attributes, connectorId),
+      toImportConfigData(existing.attributes),
       patch
     );
     const data = this.parseImportConfigData(importConfigDataSchema, merged, 'update');
@@ -151,14 +160,14 @@ export class ImportConfigClient {
   }
 
   /**
-   * Creates the import config at `id` when it does not exist, otherwise replaces it with `data`.
-   * Replacing cannot change the connector.
+   * Creates the import config at `id`, with its connector, when it does not exist. Otherwise
+   * replaces it with `data` and keeps its connector.
    */
   @withApm
   public async upsertImportConfig(
     params: UpsertImportConfigParams
   ): Promise<{ importConfig: ImportConfigResponse; created: boolean }> {
-    // `type` is accepted on upsert but not stored yet.
+    // `type` only picks the connector type, so a replace does not use it.
     const { type, ...data } = this.parseImportConfigData(
       putImportConfigDataSchema,
       params.data,
@@ -173,13 +182,6 @@ export class ImportConfigClient {
       return { importConfig, created: true };
     }
 
-    if (data.connector_id !== this.resolveConnectorId(existing)) {
-      throw Boom.badRequest(getImportConfigConnectorChangeMessage(params.id), {
-        code: ALERTING_ERROR_CODES.INVALID_IMPORT_CONFIG_DATA,
-        details: { import_config_id: params.id },
-      });
-    }
-
     const actor = await this.userService.getCurrentActor();
     const importConfig = await this.replaceImportConfig({ existing, data, actor });
     return { importConfig, created: false };
@@ -187,11 +189,13 @@ export class ImportConfigClient {
 
   @withApm
   public async deleteImportConfig({ id }: { id: string }): Promise<void> {
+    const existing = await this.getExistingImportConfig(id);
     try {
       await this.importConfigSavedObjectService.delete({ id });
     } catch (e) {
       throw this.mapNotFound(id, e);
     }
+    await this.deleteConnectorQuietly(this.resolveConnectorId(existing), id);
   }
 
   @withApm
@@ -266,6 +270,26 @@ export class ImportConfigClient {
     }
   }
 
+  /**
+   * Deletes an import's connector without failing the request: the import write it belongs to has
+   * already failed or succeeded, so a leftover connector is logged instead.
+   */
+  private async deleteConnectorQuietly(
+    connectorId: string,
+    importConfigId?: string
+  ): Promise<void> {
+    try {
+      await this.connectorService.delete(connectorId);
+    } catch (e) {
+      this.logger.warn({
+        message: 'Failed to delete the connector of an import config',
+        code: ALERTING_LOG_CODES.IMPORT_CONFIG_CONNECTOR_DELETE_FAILED,
+        labels: { connector_id: connectorId, import_config_id: importConfigId },
+        error: e,
+      });
+    }
+  }
+
   /** Writes `data` over an existing import config, guarded by its saved object version. */
   private async replaceImportConfig({
     existing,
@@ -276,9 +300,11 @@ export class ImportConfigClient {
     data: ImportConfigData;
     actor: Actor | null;
   }): Promise<ImportConfigResponse> {
+    const connectorId = this.resolveConnectorId(existing);
     const attributes = buildUpdateImportConfigAttributes({
       existing: existing.attributes,
       data,
+      connectorId,
       actor,
       now: new Date().toISOString(),
     });
@@ -287,7 +313,7 @@ export class ImportConfigClient {
       await this.importConfigSavedObjectService.update({
         id: existing.id,
         attrs: attributes,
-        references: buildImportConfigReferences(data.connector_id),
+        references: buildImportConfigReferences(connectorId),
         version: existing.version,
       });
     } catch (e) {
@@ -303,7 +329,7 @@ export class ImportConfigClient {
     return transformImportConfigToApiResponse({
       id: existing.id,
       attributes,
-      connectorId: data.connector_id,
+      connectorId,
     });
   }
 

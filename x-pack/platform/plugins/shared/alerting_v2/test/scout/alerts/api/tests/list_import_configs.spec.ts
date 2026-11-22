@@ -7,7 +7,7 @@
 
 import { expect } from '@kbn/scout/api';
 import {
-  ALERTING_V2_ALERTS_ALL_ROLE,
+  ALERTING_V2_ALERTS_AND_CONNECTORS_ALL_ROLE,
   ALERTING_V2_ALERTS_READ_ROLE,
   apiTest,
   buildCreateImportConfigData,
@@ -18,23 +18,24 @@ import {
 
 apiTest.describe('List import configs API', { tag: testData.API_ENGINE_TAG }, () => {
   let writerHeaders: Record<string, string>;
+  let alphaConnectorId: string;
 
   apiTest.beforeAll(async ({ samlAuth, apiServices }) => {
-    const { cookieHeader } = await samlAuth.asInteractiveUser(ALERTING_V2_ALERTS_ALL_ROLE);
+    const { cookieHeader } = await samlAuth.asInteractiveUser(
+      ALERTING_V2_ALERTS_AND_CONNECTORS_ALL_ROLE
+    );
     writerHeaders = { ...cookieHeader, ...testData.COMMON_HEADERS };
 
     await apiServices.alertingV2.importConfigs.cleanUp();
-    await apiServices.alertingV2.importConfigs.create(
+    ({ connector_id: alphaConnectorId } = await apiServices.alertingV2.importConfigs.create(
       buildCreateImportConfigData({
         id: 'scout-import-alpha',
-        connector_id: 'scout-connector-a',
         metadata: { name: 'Alpha production', routing_tags: ['scout'] },
       })
-    );
+    ));
     await apiServices.alertingV2.importConfigs.create(
       buildCreateImportConfigData({
         id: 'scout-import-bravo',
-        connector_id: 'scout-connector-b',
         metadata: { name: 'Bravo staging', routing_tags: ['scout'] },
       })
     );
@@ -42,7 +43,6 @@ apiTest.describe('List import configs API', { tag: testData.API_ENGINE_TAG }, ()
       buildCreateImportConfigData({
         id: 'scout-import-charlie',
         kind: 'signal',
-        connector_id: 'scout-connector-a',
         metadata: { name: 'Charlie signals' },
       })
     );
@@ -75,14 +75,13 @@ apiTest.describe('List import configs API', { tag: testData.API_ENGINE_TAG }, ()
 
   apiTest('should filter by connector id', async ({ apiClient }) => {
     const response = await apiClient.get(
-      getListImportConfigsUrl({ connector_id: 'scout-connector-a', sort_field: 'name' }),
+      getListImportConfigsUrl({ connector_id: alphaConnectorId }),
       { headers: writerHeaders }
     );
 
     expect(response).toHaveStatusCode(200);
-    expect(response.body.items.map(({ id }: { id: string }) => id).sort()).toStrictEqual([
+    expect(response.body.items.map(({ id }: { id: string }) => id)).toStrictEqual([
       'scout-import-alpha',
-      'scout-import-charlie',
     ]);
   });
 

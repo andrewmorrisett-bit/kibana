@@ -42,7 +42,11 @@ export type ImportConfigKind = z.infer<typeof importConfigKindSchema>;
 /** Type */
 
 export const importConfigTypeSchema = lazySchema(() =>
-  z.enum(IMPORT_CONFIG_TYPES).describe('The source the import receives events from.')
+  z
+    .enum(IMPORT_CONFIG_TYPES)
+    .describe(
+      'The source the import receives events from. Kibana creates a connector of this type, with no authentication, to receive them.'
+    )
 );
 
 export type ImportConfigType = z.infer<typeof importConfigTypeSchema>;
@@ -102,7 +106,7 @@ const connectorIdSchema = lazySchema(() =>
     .min(1)
     .max(ID_MAX_LENGTH)
     .describe(
-      'The ID of the connector that receives the events for this import. It cannot be changed after the import is created.'
+      'The ID of the connector that receives the events for this import. Kibana creates it with the import, and it cannot be changed.'
     )
 );
 
@@ -117,11 +121,13 @@ const importConfigDataBaseSchema = lazySchema(() =>
   z.object({
     kind: importConfigKindSchema,
     metadata: importConfigMetadataSchema,
-    connector_id: connectorIdSchema,
   })
 );
 
-/** The stored fields of an import config, which a PATCH is merged into and validated against. */
+/**
+ * The fields of an import config that callers can change, which a PATCH is merged into and
+ * validated against. The connector is set when the import is created and is not part of it.
+ */
 export const importConfigDataSchema = lazySchema(() =>
   importConfigDataBaseSchema.strict().refine(isRoutingTagsAllowedForKind, {
     message: ROUTING_TAGS_KIND_MESSAGE,
@@ -133,7 +139,7 @@ export type ImportConfigData = z.infer<typeof importConfigDataSchema>;
 
 /**
  * Data accepted when creating an import config. The `id` is optional; when omitted, Kibana
- * generates one. The `type` is accepted but not stored.
+ * generates one. The `type` picks the connector Kibana creates for the import; it is not stored.
  */
 export const createImportConfigDataSchema = lazySchema(() =>
   importConfigDataBaseSchema
@@ -157,7 +163,8 @@ export type CreateImportConfigData = z.infer<typeof createImportConfigDataSchema
 
 /**
  * Data accepted when creating or replacing an import config at a known ID. The ID comes from the
- * path, and the `type` is accepted but not stored.
+ * path. The `type` picks the connector Kibana creates when the import does not exist yet; a
+ * replace keeps the existing connector. It is not stored.
  */
 export const putImportConfigDataSchema = lazySchema(() =>
   importConfigDataBaseSchema
@@ -174,8 +181,7 @@ export type PutImportConfigData = z.infer<typeof putImportConfigDataSchema>;
 
 /**
  * Data accepted when updating an import config. Omitted fields are kept and `null` clears an
- * optional field. `connector_id` is not accepted: an import keeps the connector it was created
- * with.
+ * optional field. An import keeps the connector it was created with.
  */
 export const updateImportConfigDataSchema = lazySchema(() =>
   z
@@ -194,6 +200,7 @@ export const importConfigResponseSchema = lazySchema(() =>
   importConfigDataBaseSchema
     .extend({
       id: z.string().describe('Unique import identifier.'),
+      connector_id: connectorIdSchema,
       version: z
         .number()
         .int()

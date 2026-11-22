@@ -14,7 +14,6 @@ import {
 const validCreateData = {
   kind: 'alert',
   metadata: { name: 'Datadog production', routing_tags: ['team-a'] },
-  connector_id: 'connector-1',
   type: 'datadog',
 };
 
@@ -36,7 +35,7 @@ describe('createImportConfigDataSchema', () => {
   it.each([
     ['routing tags on a signal import', { ...validCreateData, kind: 'signal' }],
     ['an unknown kind', { ...validCreateData, kind: 'rule' }],
-    ['a missing connector id', { kind: 'alert', metadata: { name: 'Import' }, type: 'datadog' }],
+    ['a connector id', { ...validCreateData, connector_id: 'connector-1' }],
     ['a missing type', { ...validCreateData, type: undefined }],
     ['an unknown type', { ...validCreateData, type: 'pagerduty' }],
     ['an empty name', { ...validCreateData, metadata: { name: '' } }],
@@ -71,6 +70,7 @@ describe('putImportConfigDataSchema', () => {
 
   it.each([
     ['an id in the body', { ...validCreateData, id: 'import-1' }],
+    ['a connector id', { ...validCreateData, connector_id: 'connector-1' }],
     ['a missing type', { ...validCreateData, type: undefined }],
     ['routing tags on a signal import', { ...validCreateData, kind: 'signal' }],
   ])('rejects %s', (_, data) => {

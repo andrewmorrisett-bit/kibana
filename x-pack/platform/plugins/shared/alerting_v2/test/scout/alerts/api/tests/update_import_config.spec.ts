@@ -7,7 +7,7 @@
 
 import { expect } from '@kbn/scout/api';
 import {
-  ALERTING_V2_ALERTS_ALL_ROLE,
+  ALERTING_V2_ALERTS_AND_CONNECTORS_ALL_ROLE,
   ALERTING_V2_ALERTS_READ_ROLE,
   apiTest,
   buildCreateImportConfigData,
@@ -19,7 +19,9 @@ apiTest.describe('Update import config API', { tag: testData.API_ENGINE_TAG }, (
   let writerHeaders: Record<string, string>;
 
   apiTest.beforeAll(async ({ samlAuth }) => {
-    const { cookieHeader } = await samlAuth.asInteractiveUser(ALERTING_V2_ALERTS_ALL_ROLE);
+    const { cookieHeader } = await samlAuth.asInteractiveUser(
+      ALERTING_V2_ALERTS_AND_CONNECTORS_ALL_ROLE
+    );
     writerHeaders = { ...cookieHeader, ...testData.COMMON_HEADERS };
   });
 

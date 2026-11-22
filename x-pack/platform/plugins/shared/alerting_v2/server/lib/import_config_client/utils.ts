@@ -47,16 +47,18 @@ const toStoredMetadata = (
 
 export const buildCreateImportConfigAttributes = ({
   data,
+  connectorId,
   actor,
   now,
 }: {
   data: ImportConfigData;
+  connectorId: string;
   actor: Actor | null;
   now: string;
 }): ImportConfigSavedObjectAttributes => ({
   kind: data.kind,
   metadata: toStoredMetadata(data.metadata),
-  connector_id: data.connector_id,
+  connector_id: connectorId,
   version: 1,
   createdBy: actor,
   updatedBy: actor,
@@ -67,17 +69,19 @@ export const buildCreateImportConfigAttributes = ({
 export const buildUpdateImportConfigAttributes = ({
   existing,
   data,
+  connectorId,
   actor,
   now,
 }: {
   existing: ImportConfigSavedObjectAttributes;
   data: ImportConfigData;
+  connectorId: string;
   actor: Actor | null;
   now: string;
 }): ImportConfigSavedObjectAttributes => ({
   kind: data.kind,
   metadata: toStoredMetadata(data.metadata),
-  connector_id: data.connector_id,
+  connector_id: connectorId,
   version: existing.version + 1,
   createdBy: existing.createdBy,
   updatedBy: actor,
@@ -87,12 +91,10 @@ export const buildUpdateImportConfigAttributes = ({
 
 /** The stored fields a PATCH merges into, in the shape of the create data. */
 export const toImportConfigData = (
-  attributes: ImportConfigSavedObjectAttributes,
-  connectorId: string
+  attributes: ImportConfigSavedObjectAttributes
 ): ImportConfigData => ({
   kind: attributes.kind,
   metadata: toStoredMetadata(attributes.metadata),
-  connector_id: connectorId,
 });
 
 export const transformImportConfigToApiResponse = ({

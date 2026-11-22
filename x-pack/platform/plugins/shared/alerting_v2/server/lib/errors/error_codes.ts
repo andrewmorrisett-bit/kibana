@@ -573,6 +573,13 @@ export const ALERTING_LOG_CODES = {
    * import was written, since the import config client always writes it.
    */
   IMPORT_CONFIG_CONNECTOR_REFERENCE_NOT_FOUND: 'IMPORT_CONFIG_CONNECTOR_REFERENCE_NOT_FOUND',
+  /**
+   * The connector of an import config could not be deleted, either after the
+   * import failed to save or after the import was deleted. The request still
+   * returns its own result, so the connector is left behind. Operator should
+   * delete the connector named in `connector_id` from the connectors page.
+   */
+  IMPORT_CONFIG_CONNECTOR_DELETE_FAILED: 'IMPORT_CONFIG_CONNECTOR_DELETE_FAILED',
 
   // ─────────────────────────── Rule executor ─────────────────────────
   /**
