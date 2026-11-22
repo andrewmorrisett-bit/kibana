@@ -7,18 +7,20 @@
 
 import type { KbnClient, ScoutLogger } from '@kbn/scout';
 import { measurePerformanceAsync } from '@kbn/scout';
-import type { CreateImportConfigData, ImportConfigResponse } from '@kbn/alerting-v2-schemas';
+import type {
+  CreateImportConfigData,
+  FindImportConfigsResponse,
+  ImportConfigResponse,
+} from '@kbn/alerting-v2-schemas';
 import {
   COMMON_HEADERS,
   IMPORT_CONFIG_API_PATH,
   IMPORT_CONFIG_SAVED_OBJECT_TYPE,
 } from '../constants';
-import { getImportConfigUrl } from '../urls';
+import { getImportConfigUrl, getListImportConfigsUrl } from '../urls';
 
 export interface ImportConfigsApiService {
   create: (data: CreateImportConfigData) => Promise<ImportConfigResponse>;
-  /** Whether an import config saved object with this id exists. */
-  exists: (id: string) => Promise<boolean>;
   /** Deletes every import config and the connector each one created. */
   cleanUp: () => Promise<void>;
 }
@@ -45,21 +47,14 @@ export const getImportConfigsApiService = ({
       return response.data;
     }),
 
-  // A find, not a get: the KbnClient retries a get that returns 404 several times.
-  exists: (id) =>
-    measurePerformanceAsync(log, 'importConfigs.exists', async () => {
-      const { saved_objects: savedObjects } = await kbnClient.savedObjects.find({
-        type: IMPORT_CONFIG_SAVED_OBJECT_TYPE,
-      });
-      return savedObjects.some((savedObject) => savedObject.id === id);
-    }),
-
   cleanUp: () =>
     measurePerformanceAsync(log, 'importConfigs.cleanUp', async () => {
-      const { saved_objects: savedObjects } = await kbnClient.savedObjects.find({
-        type: IMPORT_CONFIG_SAVED_OBJECT_TYPE,
+      const { data } = await kbnClient.request<FindImportConfigsResponse>({
+        method: 'GET',
+        path: getListImportConfigsUrl({ per_page: 100 }),
+        headers: COMMON_HEADERS,
       });
-      for (const { id } of savedObjects) {
+      for (const { id } of data.items) {
         await kbnClient.request({
           method: 'DELETE',
           path: getImportConfigUrl(id),

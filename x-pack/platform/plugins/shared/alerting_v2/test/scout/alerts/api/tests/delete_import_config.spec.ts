@@ -38,14 +38,17 @@ apiTest.describe('Delete import config API', { tag: testData.API_ENGINE_TAG }, (
     await apiServices.alertingV2.importConfigs.cleanUp();
   });
 
-  apiTest('should delete the import and its connector', async ({ apiClient, apiServices }) => {
+  apiTest('should delete the import and its connector', async ({ apiClient }) => {
     const response = await apiClient.delete(getImportConfigUrl('scout-import-delete'), {
       headers: writerHeaders,
     });
 
     expect(response).toHaveStatusCode(204);
 
-    expect(await apiServices.alertingV2.importConfigs.exists('scout-import-delete')).toBe(false);
+    const getResponse = await apiClient.get(getImportConfigUrl('scout-import-delete'), {
+      headers: writerHeaders,
+    });
+    expect(getResponse).toHaveStatusCode(404);
 
     const connectorResponse = await apiClient.get(getConnectorUrl(connectorId), {
       headers: writerHeaders,

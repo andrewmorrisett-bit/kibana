@@ -13,6 +13,7 @@ import {
   apiTest,
   buildCreateImportConfigData,
   getConnectorUrl,
+  getImportConfigUrl,
   getListImportConfigsUrl,
   NO_ACCESS_ROLE,
   testData,
@@ -38,7 +39,7 @@ apiTest.describe('Create import config API', { tag: testData.API_ENGINE_TAG }, (
 
   apiTest(
     'should create an import and a receive-only connector for it, without returning the type',
-    async ({ apiClient, apiServices }) => {
+    async ({ apiClient }) => {
       const data = buildCreateImportConfigData();
 
       const response = await apiClient.post(getListImportConfigsUrl(), {
@@ -55,7 +56,11 @@ apiTest.describe('Create import config API', { tag: testData.API_ENGINE_TAG }, (
       });
       expect(Object.keys(response.body)).not.toContain('type');
 
-      expect(await apiServices.alertingV2.importConfigs.exists(response.body.id)).toBe(true);
+      const getResponse = await apiClient.get(getImportConfigUrl(response.body.id), {
+        headers: writerHeaders,
+      });
+      expect(getResponse).toHaveStatusCode(200);
+      expect(getResponse.body).toStrictEqual(response.body);
 
       const connectorResponse = await apiClient.get(getConnectorUrl(response.body.connector_id), {
         headers: writerHeaders,
@@ -136,7 +141,7 @@ apiTest.describe('Create import config API', { tag: testData.API_ENGINE_TAG }, (
 
   apiTest(
     'authorization: should return 403 and create nothing for a user without connector privileges',
-    async ({ apiClient, apiServices, samlAuth }) => {
+    async ({ apiClient, samlAuth }) => {
       const { cookieHeader } = await samlAuth.asInteractiveUser(ALERTING_V2_ALERTS_ALL_ROLE);
 
       const response = await apiClient.post(getListImportConfigsUrl(), {
@@ -146,9 +151,10 @@ apiTest.describe('Create import config API', { tag: testData.API_ENGINE_TAG }, (
 
       expect(response).toHaveStatusCode(403);
 
-      expect(await apiServices.alertingV2.importConfigs.exists('scout-import-no-connectors')).toBe(
-        false
-      );
+      const getResponse = await apiClient.get(getImportConfigUrl('scout-import-no-connectors'), {
+        headers: writerHeaders,
+      });
+      expect(getResponse).toHaveStatusCode(404);
     }
   );
 
