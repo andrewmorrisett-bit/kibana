@@ -14,22 +14,21 @@ import { ImportConfigClient } from '../../lib/import_config_client';
 import { ALERTING_V2_API_PRIVILEGES } from '../../lib/security/privileges';
 import { AlertingRouteContext } from '../alerting_route_context';
 import { BaseAlertingRoute } from '../base_alerting_route';
-import { ALERTING_V2_IMPORT_CONFIG_API_PATH } from '../constants';
+import { ALERTING_V2_INTERNAL_IMPORT_CONFIG_API_PATH } from '../constants';
 import { IMPORT_CONFIG_NOT_FOUND_DESCRIPTION } from './import_config_route_descriptions';
 import { importConfigIdParamsSchema } from './route_schemas';
 
 @injectable()
 export class DeleteImportConfigRoute extends BaseAlertingRoute {
   static method = 'delete' as const;
-  static path = `${ALERTING_V2_IMPORT_CONFIG_API_PATH}/{id}`;
+  static path = `${ALERTING_V2_INTERNAL_IMPORT_CONFIG_API_PATH}/{id}`;
   static security: RouteSecurity = {
     authz: {
       requiredPrivileges: [ALERTING_V2_API_PRIVILEGES.alerts.write],
     },
   };
   static routeOptions = {
-    access: 'public' as const,
-    availability: { stability: 'experimental' as const },
+    access: 'internal' as const,
     summary: 'Delete an import',
     description:
       'Deletes the import whose ID you include in the URL path. This request has no body.',

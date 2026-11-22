@@ -19,7 +19,7 @@ import { ImportConfigClient } from '../../lib/import_config_client';
 import { ALERTING_V2_API_PRIVILEGES } from '../../lib/security/privileges';
 import { AlertingRouteContext } from '../alerting_route_context';
 import { BaseAlertingRoute } from '../base_alerting_route';
-import { ALERTING_V2_IMPORT_CONFIG_API_PATH } from '../constants';
+import { ALERTING_V2_INTERNAL_IMPORT_CONFIG_API_PATH } from '../constants';
 import { INVALID_SCHEMA_OR_PARAMETERS_DESCRIPTION } from '../route_descriptions';
 import {
   IMPORT_CONFIG_NOT_FOUND_DESCRIPTION,
@@ -30,15 +30,14 @@ import { importConfigIdParamsSchema } from './route_schemas';
 @injectable()
 export class UpdateImportConfigRoute extends BaseAlertingRoute {
   static method = 'patch' as const;
-  static path = `${ALERTING_V2_IMPORT_CONFIG_API_PATH}/{id}`;
+  static path = `${ALERTING_V2_INTERNAL_IMPORT_CONFIG_API_PATH}/{id}`;
   static security: RouteSecurity = {
     authz: {
       requiredPrivileges: [ALERTING_V2_API_PRIVILEGES.alerts.write],
     },
   };
   static routeOptions = {
-    access: 'public' as const,
-    availability: { stability: 'experimental' as const },
+    access: 'internal' as const,
     summary: 'Partially update an import',
     description:
       'Updates only the fields you send and keeps the rest. Send `null` to clear an optional field. The connector of an import cannot be changed.',

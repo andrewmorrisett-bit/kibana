@@ -18,22 +18,21 @@ import { ImportConfigClient } from '../../lib/import_config_client';
 import { ALERTING_V2_API_PRIVILEGES } from '../../lib/security/privileges';
 import { AlertingRouteContext } from '../alerting_route_context';
 import { BaseAlertingRoute } from '../base_alerting_route';
-import { ALERTING_V2_IMPORT_CONFIG_API_PATH } from '../constants';
+import { ALERTING_V2_INTERNAL_IMPORT_CONFIG_API_PATH } from '../constants';
 import { INVALID_SCHEMA_OR_PARAMETERS_DESCRIPTION } from '../route_descriptions';
 import { IMPORT_CONFIG_ALREADY_EXISTS_DESCRIPTION } from './import_config_route_descriptions';
 
 @injectable()
 export class CreateImportConfigRoute extends BaseAlertingRoute {
   static method = 'post' as const;
-  static path = ALERTING_V2_IMPORT_CONFIG_API_PATH;
+  static path = ALERTING_V2_INTERNAL_IMPORT_CONFIG_API_PATH;
   static security: RouteSecurity = {
     authz: {
       requiredPrivileges: [ALERTING_V2_API_PRIVILEGES.alerts.write],
     },
   };
   static routeOptions = {
-    access: 'public' as const,
-    availability: { stability: 'experimental' as const },
+    access: 'internal' as const,
     summary: 'Create an import',
     description:
       'Creates an import. You can supply your own `id`; if you omit it, Kibana generates one. If an import with that `id` already exists, the request fails with HTTP 409 and the existing import is not changed.',

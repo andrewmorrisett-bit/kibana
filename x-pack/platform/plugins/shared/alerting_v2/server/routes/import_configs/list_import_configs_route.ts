@@ -20,7 +20,7 @@ import type { FindImportConfigsParams } from '../../lib/import_config_client';
 import { ALERTING_V2_API_PRIVILEGES } from '../../lib/security/privileges';
 import { AlertingRouteContext } from '../alerting_route_context';
 import { BaseAlertingRoute } from '../base_alerting_route';
-import { ALERTING_V2_IMPORT_CONFIG_API_PATH } from '../constants';
+import { ALERTING_V2_INTERNAL_IMPORT_CONFIG_API_PATH } from '../constants';
 import { assertAllFieldsMapped, type Complete } from '../mapper_types';
 import { INVALID_SCHEMA_OR_PARAMETERS_DESCRIPTION } from '../route_descriptions';
 
@@ -40,15 +40,14 @@ export const toFindImportConfigsParams = ({
 @injectable()
 export class ListImportConfigsRoute extends BaseAlertingRoute {
   static method = 'get' as const;
-  static path = ALERTING_V2_IMPORT_CONFIG_API_PATH;
+  static path = ALERTING_V2_INTERNAL_IMPORT_CONFIG_API_PATH;
   static security: RouteSecurity = {
     authz: {
       requiredPrivileges: [ALERTING_V2_API_PRIVILEGES.alerts.read],
     },
   };
   static routeOptions = {
-    access: 'public' as const,
-    availability: { stability: 'experimental' as const },
+    access: 'internal' as const,
     summary: 'List imports',
     description: 'Get a paginated list of imports with optional search and sorting.',
   } as const;
