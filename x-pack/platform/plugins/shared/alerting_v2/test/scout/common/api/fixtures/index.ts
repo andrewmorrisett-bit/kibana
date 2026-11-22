@@ -60,6 +60,7 @@ export {
   buildSeriesId,
   buildCreateRuleData,
   buildCreateActionPolicyData,
+  buildCreateImportConfigData,
   buildRuleTemplateData,
   buildV1RuleTemplateAttributes,
   buildWorkflowYaml,
@@ -108,6 +109,8 @@ export {
   getRuleTemplateTagsUrl,
   getRuleTemplateUrl,
   getInstallRuleTemplateUrl,
+  getImportConfigUrl,
+  getListImportConfigsUrl,
 } from '../../urls';
 export {
   ACTION_POLICY_PER_PAGE_MAX,

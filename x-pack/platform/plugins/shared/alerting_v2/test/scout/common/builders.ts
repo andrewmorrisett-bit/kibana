@@ -10,6 +10,7 @@ import { parse, stringify } from 'yaml';
 import { DEFAULT_EMAIL_PARAMS_TEMPLATE } from '@kbn/alerting-v2-constants';
 import type {
   CreateActionPolicyDataInput,
+  CreateImportConfigData,
   CreateRuleData,
   RuleTemplateData,
 } from '@kbn/alerting-v2-schemas';
@@ -103,6 +104,17 @@ export const buildCreateActionPolicyData = (
   input: BuildCreateActionPolicyDataInput = {}
 ): CreateActionPolicyDataInput => ({
   ...ACTION_POLICY_DEFAULTS,
+  ...input,
+});
+
+/** Builds a valid create import config body; any field can be overridden. */
+export const buildCreateImportConfigData = (
+  input: Partial<CreateImportConfigData> = {}
+): CreateImportConfigData => ({
+  kind: 'alert',
+  type: 'datadog',
+  connector_id: 'scout-datadog-connector',
+  metadata: { name: 'Scout Datadog import', routing_tags: ['scout'] },
   ...input,
 });
 

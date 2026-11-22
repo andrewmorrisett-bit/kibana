@@ -18,6 +18,7 @@ import {
   EXECUTION_HISTORY_API_PATH,
   RULE_EXECUTIONS_API_PATH,
   RULE_TEMPLATE_API_PATH,
+  IMPORT_CONFIG_API_PATH,
 } from './constants';
 
 const toQueryString = (query: Record<string, string | number | string[] | undefined>): string => {
@@ -162,4 +163,14 @@ export const listRuleExecutionsUrl = (query?: ListRuleExecutionsQueryInput): str
     }
   }
   return `${RULE_EXECUTIONS_API_PATH}?${params.toString()}`;
+};
+
+export const getImportConfigUrl = (id: string): string =>
+  `${IMPORT_CONFIG_API_PATH}/${encodeURIComponent(id)}`;
+
+export const getListImportConfigsUrl = (
+  query: Record<string, string | number | undefined> = {}
+): string => {
+  const qs = toQueryString(query);
+  return qs ? `${IMPORT_CONFIG_API_PATH}?${qs}` : IMPORT_CONFIG_API_PATH;
 };
