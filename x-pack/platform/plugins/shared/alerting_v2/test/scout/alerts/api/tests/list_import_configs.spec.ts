@@ -85,6 +85,27 @@ apiTest.describe('List import configs API', { tag: testData.API_ENGINE_TAG }, ()
     ]);
   });
 
+  apiTest('should filter by type and sort by it', async ({ apiClient }) => {
+    const response = await apiClient.get(
+      getListImportConfigsUrl({ type: 'datadog', sort_field: 'type' }),
+      { headers: writerHeaders }
+    );
+
+    expect(response).toHaveStatusCode(200);
+    expect(response.body.total).toBe(3);
+    expect(response.body.items.every(({ type }: { type: string }) => type === 'datadog')).toBe(
+      true
+    );
+  });
+
+  apiTest('should return 400 for an unknown type', async ({ apiClient }) => {
+    const response = await apiClient.get(getListImportConfigsUrl({ type: 'splunk' }), {
+      headers: writerHeaders,
+    });
+
+    expect(response).toHaveStatusCode(400);
+  });
+
   apiTest('should search import names', async ({ apiClient }) => {
     const response = await apiClient.get(getListImportConfigsUrl({ search: 'staging' }), {
       headers: writerHeaders,

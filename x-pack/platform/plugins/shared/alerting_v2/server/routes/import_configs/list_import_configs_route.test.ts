@@ -17,6 +17,7 @@ describe('toFindImportConfigsParams', () => {
         sort_field: 'kind',
         sort_order: 'desc',
         connector_id: 'connector-1',
+        type: 'datadog',
       })
     ).toEqual({
       page: 3,
@@ -25,6 +26,7 @@ describe('toFindImportConfigsParams', () => {
       sortField: 'kind',
       sortOrder: 'desc',
       connectorId: 'connector-1',
+      type: 'datadog',
     });
   });
 
@@ -36,6 +38,7 @@ describe('toFindImportConfigsParams', () => {
       sortField: undefined,
       sortOrder: undefined,
       connectorId: undefined,
+      type: undefined,
     });
   });
 });

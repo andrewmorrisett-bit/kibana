@@ -247,6 +247,9 @@ export const findImportConfigsRequestSchema = lazySchema(() =>
       connector_id: connectorIdSchema
         .optional()
         .describe('Only return the imports that use this connector.'),
+      type: importConfigTypeSchema
+        .optional()
+        .describe('Only return the imports that receive events from this source.'),
     })
     .strict()
     .refine(

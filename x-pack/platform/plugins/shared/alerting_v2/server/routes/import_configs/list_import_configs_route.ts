@@ -31,10 +31,11 @@ export const toFindImportConfigsParams = ({
   sort_field: sortField,
   sort_order: sortOrder,
   connector_id: connectorId,
+  type,
   ...rest
 }: FindImportConfigsRequest): Complete<FindImportConfigsParams> => {
   assertAllFieldsMapped(rest);
-  return { page, perPage, search, sortField, sortOrder, connectorId };
+  return { page, perPage, search, sortField, sortOrder, connectorId, type };
 };
 
 @injectable()
