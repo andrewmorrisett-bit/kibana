@@ -170,3 +170,8 @@ export const RULE_CHANGE_HISTORY_MAX_RESULT_WINDOW = 10_000;
  * Canonical alert event severity levels, ordered from least to most severe.
  */
 export const SEVERITY_LEVELS = ['info', 'low', 'medium', 'high', 'critical'] as const;
+
+/**
+ * Sources an alert import can receive events from.
+ */
+export const IMPORT_CONFIG_TYPES = ['datadog'] as const;
