@@ -31,6 +31,7 @@ const CREATOR = { profile_uid: 'creator_profile_uid' };
 const CONNECTOR_REFERENCE = { name: 'connector', type: 'action', id: 'connector-1' };
 
 const createData = (overrides: Partial<CreateImportConfigData> = {}): CreateImportConfigData => ({
+  type: 'datadog',
   kind: 'alert',
   metadata: {
     name: 'Datadog production',
@@ -38,13 +39,13 @@ const createData = (overrides: Partial<CreateImportConfigData> = {}): CreateImpo
     tags: ['datadog'],
     routing_tags: ['team-a'],
   },
-  type: 'datadog',
   ...overrides,
 });
 
 const storedAttributes = (
   overrides: Partial<ImportConfigSavedObjectAttributes> = {}
 ): ImportConfigSavedObjectAttributes => ({
+  type: 'datadog',
   kind: 'alert',
   metadata: {
     name: 'Datadog production',
@@ -111,6 +112,7 @@ describe('ImportConfigClient', () => {
       expect(savedObjectService.create).toHaveBeenCalledWith({
         id: 'import-1',
         attrs: {
+          type: 'datadog',
           kind: 'alert',
           metadata: {
             name: 'Datadog production',
@@ -129,6 +131,7 @@ describe('ImportConfigClient', () => {
       });
       expect(result).toEqual({
         id: 'import-1',
+        type: 'datadog',
         kind: 'alert',
         metadata: {
           name: 'Datadog production',
@@ -250,6 +253,7 @@ describe('ImportConfigClient', () => {
 
       expect(result).toEqual({
         id: 'import-1',
+        type: 'datadog',
         kind: 'alert',
         metadata: {
           name: 'Datadog production',
@@ -323,6 +327,7 @@ describe('ImportConfigClient', () => {
         id: 'import-1',
         version: 'WzEsMV0=',
         attrs: {
+          type: 'datadog',
           kind: 'alert',
           metadata: { name: 'Datadog prod', tags: ['datadog'], routing_tags: ['team-a'] },
           connector_id: 'connector-1',
@@ -409,6 +414,17 @@ describe('ImportConfigClient', () => {
       expect(savedObjectService.get).not.toHaveBeenCalled();
     });
 
+    it('does not accept a new type', async () => {
+      const error = await client
+        .updateImportConfig({ id: 'import-1', data: { type: 'datadog' } as never })
+        .catch((e) => e);
+
+      expect(getBoomData(error)).toEqual(
+        expect.objectContaining({ code: ALERTING_ERROR_CODES.INVALID_IMPORT_CONFIG_DATA })
+      );
+      expect(savedObjectService.get).not.toHaveBeenCalled();
+    });
+
     it('throws IMPORT_CONFIG_NOT_FOUND when the import does not exist', async () => {
       savedObjectService.get.mockRejectedValue(
         SavedObjectsErrorHelpers.createGenericNotFoundError(
@@ -469,7 +485,7 @@ describe('ImportConfigClient', () => {
       expect(savedObjectService.create).toHaveBeenCalledWith(
         expect.objectContaining({
           id: 'import-1',
-          attrs: expect.not.objectContaining({ type: expect.anything() }),
+          attrs: expect.objectContaining({ type: 'datadog' }),
           references: [CONNECTOR_REFERENCE],
         })
       );
@@ -491,6 +507,7 @@ describe('ImportConfigClient', () => {
         id: 'import-1',
         version: 'WzEsMV0=',
         attrs: {
+          type: 'datadog',
           kind: 'signal',
           metadata: { name: 'Replaced' },
           connector_id: 'connector-1',
@@ -505,6 +522,27 @@ describe('ImportConfigClient', () => {
       expect(importConfig).toEqual(
         expect.objectContaining({ id: 'import-1', kind: 'signal', version: 4 })
       );
+    });
+
+    it('rejects a type that differs from the stored one', async () => {
+      savedObjectService.get.mockResolvedValue(
+        storedDoc({ attributes: storedAttributes({ type: 'another-source' as never }) })
+      );
+
+      const error = await client
+        .upsertImportConfig({ id: 'import-1', data: createData() })
+        .catch((e) => e);
+
+      expect(getBoomData(error)).toEqual(
+        expect.objectContaining({
+          code: ALERTING_ERROR_CODES.INVALID_IMPORT_CONFIG_DATA,
+          details: { context: 'upsert', import_config_id: 'import-1' },
+        })
+      );
+      expect(error.message).toBe(
+        'Import config with ID "import-1" has type "another-source", which cannot be changed'
+      );
+      expect(savedObjectService.update).not.toHaveBeenCalled();
     });
 
     it('throws INVALID_IMPORT_CONFIG_DATA before reading when the data fails validation', async () => {
@@ -618,7 +656,7 @@ describe('ImportConfigClient', () => {
       });
     });
 
-    it('maps the sort field and passes the search and connector filter', async () => {
+    it('maps the sort field and passes the search, connector and type filters', async () => {
       await client.findImportConfigs({
         page: 2,
         perPage: 50,
@@ -626,6 +664,7 @@ describe('ImportConfigClient', () => {
         sortField: 'name',
         sortOrder: 'desc',
         connectorId: 'connector-1',
+        type: 'datadog',
       });
 
       expect(savedObjectService.find).toHaveBeenCalledWith({
@@ -635,7 +674,17 @@ describe('ImportConfigClient', () => {
         sortField: 'metadata.name.keyword',
         sortOrder: 'desc',
         connectorId: 'connector-1',
+        type: 'datadog',
       });
+    });
+
+    it('sorts by the type attribute', async () => {
+      savedObjectService.find.mockResolvedValue({ saved_objects: [], total: 0 });
+      await client.findImportConfigs({ sortField: 'type' });
+
+      expect(savedObjectService.find).toHaveBeenCalledWith(
+        expect.objectContaining({ sortField: 'type' })
+      );
     });
   });
 });

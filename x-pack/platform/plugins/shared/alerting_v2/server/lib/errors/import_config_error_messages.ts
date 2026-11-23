@@ -13,6 +13,9 @@ export const getImportConfigNotFoundMessage = (id: string): string =>
 export const getImportConfigAlreadyExistsMessage = (id: string): string =>
   `Import config with ID "${id}" already exists`;
 
+export const getImportConfigTypeChangeMessage = (id: string, type: string): string =>
+  `Import config with ID "${id}" has type "${type}", which cannot be changed`;
+
 export const getImportConfigVersionConflictMessage = (id: string): string =>
   `Import config with ID "${id}" has already been updated by another user`;
 

@@ -45,7 +45,7 @@ export const importConfigTypeSchema = lazySchema(() =>
   z
     .enum(IMPORT_CONFIG_TYPES)
     .describe(
-      'The source the import receives events from. Kibana creates a connector of this type, with no authentication, to receive them.'
+      'The source the import receives events from. Kibana creates a connector of this type, with no authentication, to receive them. It cannot be changed after the import is created.'
     )
 );
 
@@ -119,14 +119,15 @@ const isRoutingTagsAllowedForKind = (data: {
 
 const importConfigDataBaseSchema = lazySchema(() =>
   z.object({
+    type: importConfigTypeSchema,
     kind: importConfigKindSchema,
     metadata: importConfigMetadataSchema,
   })
 );
 
 /**
- * The fields of an import config that callers can change, which a PATCH is merged into and
- * validated against. The connector is set when the import is created and is not part of it.
+ * The stored fields of an import config that callers set, which a PATCH is merged into and
+ * validated against. The connector is created with the import and is not part of it.
  */
 export const importConfigDataSchema = lazySchema(() =>
   importConfigDataBaseSchema.strict().refine(isRoutingTagsAllowedForKind, {
@@ -139,7 +140,7 @@ export type ImportConfigData = z.infer<typeof importConfigDataSchema>;
 
 /**
  * Data accepted when creating an import config. The `id` is optional; when omitted, Kibana
- * generates one. The `type` picks the connector Kibana creates for the import; it is not stored.
+ * generates one. Kibana creates a connector of the given `type` for the import.
  */
 export const createImportConfigDataSchema = lazySchema(() =>
   importConfigDataBaseSchema
@@ -149,7 +150,6 @@ export const createImportConfigDataSchema = lazySchema(() =>
         .describe(
           `The import ID. If omitted, Kibana generates one. If an import with this ID already exists, the request fails with a 409 error. ${ENTITY_ID_NOTE}`
         ),
-      type: importConfigTypeSchema,
     })
     .strict()
     .refine(isRoutingTagsAllowedForKind, {
@@ -163,12 +163,11 @@ export type CreateImportConfigData = z.infer<typeof createImportConfigDataSchema
 
 /**
  * Data accepted when creating or replacing an import config at a known ID. The ID comes from the
- * path. The `type` picks the connector Kibana creates when the import does not exist yet; a
- * replace keeps the existing connector. It is not stored.
+ * path. A create makes a connector of the given `type`. A replace keeps the existing connector,
+ * and its `type` must match the stored one.
  */
 export const putImportConfigDataSchema = lazySchema(() =>
   importConfigDataBaseSchema
-    .extend({ type: importConfigTypeSchema })
     .strict()
     .refine(isRoutingTagsAllowedForKind, {
       message: ROUTING_TAGS_KIND_MESSAGE,
@@ -181,7 +180,8 @@ export type PutImportConfigData = z.infer<typeof putImportConfigDataSchema>;
 
 /**
  * Data accepted when updating an import config. Omitted fields are kept and `null` clears an
- * optional field. An import keeps the connector it was created with.
+ * optional field. `type` is not accepted: an import keeps the source and connector it was
+ * created with.
  */
 export const updateImportConfigDataSchema = lazySchema(() =>
   z
@@ -218,7 +218,7 @@ export type ImportConfigResponse = z.infer<typeof importConfigResponseSchema>;
 
 /** Sort field for listing import configs. */
 export const findImportConfigsSortFieldSchema = lazySchema(() =>
-  z.enum(['name', 'kind']).describe('The available fields to sort imports by.')
+  z.enum(['name', 'kind', 'type']).describe('The available fields to sort imports by.')
 );
 
 export type FindImportConfigsSortField = z.infer<typeof findImportConfigsSortFieldSchema>;

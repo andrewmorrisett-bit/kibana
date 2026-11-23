@@ -23,6 +23,7 @@ import { buildSoSearch } from '../build_so_search';
 import { ALERTING_ERROR_CODES, ALERTING_LOG_CODES } from '../errors/error_codes';
 import {
   getImportConfigAlreadyExistsMessage,
+  getImportConfigTypeChangeMessage,
   getImportConfigNotFoundMessage,
   getImportConfigVersionConflictMessage,
   getInvalidImportConfigDataMessage,
@@ -94,13 +95,16 @@ export class ImportConfigClient {
 
   @withApm
   public async createImportConfig(params: CreateImportConfigParams): Promise<ImportConfigResponse> {
-    const { id, type, ...data } = this.parseImportConfigData(
+    const { id, ...data } = this.parseImportConfigData(
       createImportConfigDataSchema,
       params.data,
       'create'
     );
     const actor = await this.userService.getCurrentActor();
-    const connectorId = await this.connectorService.create({ type, name: data.metadata.name });
+    const connectorId = await this.connectorService.create({
+      type: data.type,
+      name: data.metadata.name,
+    });
     const attributes = buildCreateImportConfigAttributes({
       data,
       connectorId,
@@ -167,19 +171,20 @@ export class ImportConfigClient {
   public async upsertImportConfig(
     params: UpsertImportConfigParams
   ): Promise<{ importConfig: ImportConfigResponse; created: boolean }> {
-    // `type` only picks the connector type, so a replace does not use it.
-    const { type, ...data } = this.parseImportConfigData(
-      putImportConfigDataSchema,
-      params.data,
-      'upsert'
-    );
+    const data = this.parseImportConfigData(putImportConfigDataSchema, params.data, 'upsert');
     const existing = await this.findImportConfig(params.id);
 
     if (!existing) {
-      const importConfig = await this.createImportConfig({
-        data: { ...data, type, id: params.id },
-      });
+      const importConfig = await this.createImportConfig({ data: { ...data, id: params.id } });
       return { importConfig, created: true };
+    }
+
+    // The connector, and so the type, is fixed when the import is created.
+    if (data.type !== existing.attributes.type) {
+      throw Boom.badRequest(getImportConfigTypeChangeMessage(params.id, existing.attributes.type), {
+        code: ALERTING_ERROR_CODES.INVALID_IMPORT_CONFIG_DATA,
+        details: { context: 'upsert', import_config_id: params.id },
+      });
     }
 
     const actor = await this.userService.getCurrentActor();
@@ -212,6 +217,7 @@ export class ImportConfigClient {
       sortField: mapImportConfigSortField(params.sortField),
       sortOrder: params.sortOrder,
       connectorId: params.connectorId,
+      type: params.type,
     });
 
     return {

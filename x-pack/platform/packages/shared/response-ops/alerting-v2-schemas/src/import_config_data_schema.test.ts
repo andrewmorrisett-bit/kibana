@@ -12,9 +12,9 @@ import {
 } from './import_config_data_schema';
 
 const validCreateData = {
+  type: 'datadog',
   kind: 'alert',
   metadata: { name: 'Datadog production', routing_tags: ['team-a'] },
-  type: 'datadog',
 };
 
 describe('createImportConfigDataSchema', () => {
@@ -60,6 +60,10 @@ describe('updateImportConfigDataSchema', () => {
     expect(updateImportConfigDataSchema.safeParse({ connector_id: 'connector-2' }).success).toBe(
       false
     );
+  });
+
+  it('does not accept a type', () => {
+    expect(updateImportConfigDataSchema.safeParse({ type: 'datadog' }).success).toBe(false);
   });
 });
 

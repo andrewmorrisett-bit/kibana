@@ -49,11 +49,11 @@ apiTest.describe('Upsert import config API', { tag: testData.API_ENGINE_TAG }, (
     expect(response).toHaveStatusCode(201);
     expect(response.body).toMatchObject({
       id: 'scout-import-upsert',
+      type: data.type,
       kind: data.kind,
       metadata: data.metadata,
       version: 1,
     });
-    expect(Object.keys(response.body)).not.toContain('type');
   });
 
   apiTest(
@@ -74,6 +74,7 @@ apiTest.describe('Upsert import config API', { tag: testData.API_ENGINE_TAG }, (
       expect(response).toHaveStatusCode(200);
       expect(response.body).toMatchObject({
         id: 'scout-import-upsert',
+        type: 'datadog',
         kind: 'signal',
         metadata: { name: 'After replace' },
         connector_id: existing.connector_id,

@@ -56,6 +56,7 @@ export const buildCreateImportConfigAttributes = ({
   actor: Actor | null;
   now: string;
 }): ImportConfigSavedObjectAttributes => ({
+  type: data.type,
   kind: data.kind,
   metadata: toStoredMetadata(data.metadata),
   connector_id: connectorId,
@@ -79,6 +80,7 @@ export const buildUpdateImportConfigAttributes = ({
   actor: Actor | null;
   now: string;
 }): ImportConfigSavedObjectAttributes => ({
+  type: existing.type,
   kind: data.kind,
   metadata: toStoredMetadata(data.metadata),
   connector_id: connectorId,
@@ -93,6 +95,7 @@ export const buildUpdateImportConfigAttributes = ({
 export const toImportConfigData = (
   attributes: ImportConfigSavedObjectAttributes
 ): ImportConfigData => ({
+  type: attributes.type,
   kind: attributes.kind,
   metadata: toStoredMetadata(attributes.metadata),
 });
@@ -107,6 +110,7 @@ export const transformImportConfigToApiResponse = ({
   connectorId: string;
 }): ImportConfigResponse => ({
   id,
+  type: attributes.type,
   kind: attributes.kind,
   metadata: toStoredMetadata(attributes.metadata),
   connector_id: connectorId,
@@ -120,6 +124,7 @@ export const transformImportConfigToApiResponse = ({
 const SORT_FIELDS: Record<FindImportConfigsSortField, string> = {
   name: 'metadata.name.keyword',
   kind: 'kind',
+  type: 'type',
 };
 
 export const mapImportConfigSortField = (
