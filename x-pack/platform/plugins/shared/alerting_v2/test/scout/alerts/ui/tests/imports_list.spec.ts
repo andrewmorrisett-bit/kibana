@@ -7,7 +7,10 @@
 
 import { expect } from '@kbn/scout/ui';
 import { ALERTING_V2_EXPERIMENTAL_FEATURES_SETTING_ID } from '@kbn/alerting-v2-constants';
-import { ALERTING_V2_ALERTS_AND_CONNECTORS_READ_ROLE } from '../../../common/roles';
+import {
+  ALERTING_V2_ALERTS_AND_CONNECTORS_ALL_ROLE,
+  ALERTING_V2_ALERTS_AND_CONNECTORS_READ_ROLE,
+} from '../../../common/roles';
 import { buildCreateImportConfigData, test, testData } from '../fixtures';
 
 /*
@@ -67,5 +70,20 @@ test.describe('Import alerts page - list', { tag: testData.UI_TAG }, () => {
         /Alpha production/,
       ]);
     });
+
+    await test.step('hides the delete action from a read-only user', async () => {
+      await expect(importsList.actionsButtons).toHaveCount(0);
+    });
+  });
+
+  test('deletes an import', async ({ browserAuth, pageObjects }) => {
+    const { importsList } = pageObjects;
+    await browserAuth.loginWithCustomRole(ALERTING_V2_ALERTS_AND_CONNECTORS_ALL_ROLE);
+    await importsList.goto();
+    await expect(importsList.nameCells).toHaveCount(3);
+
+    await importsList.deleteImport('scout-ui-import-bravo');
+
+    await expect(importsList.nameCells).toHaveText([/Alpha production/, /Charlie production/]);
   });
 });

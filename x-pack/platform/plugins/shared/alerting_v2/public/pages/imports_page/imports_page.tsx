@@ -10,6 +10,8 @@ import useDebounce from 'react-use/lib/useDebounce';
 import { EuiSpacer } from '@elastic/eui';
 import { AppHeader } from '@kbn/app-header';
 import { i18n } from '@kbn/i18n';
+import { CoreStart, useService } from '@kbn/core-di-browser';
+import { UserCapabilities } from '../../services/user_capabilities';
 import { ImportsTable, type ImportsTableChange } from '../../components/imports/imports_table';
 import { useFetchImports } from '../../hooks/use_fetch_imports';
 
@@ -31,6 +33,10 @@ export const ImportsPage = () => {
   const [tableState, setTableState] = useState(INITIAL_TABLE_STATE);
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
+  const { capabilities } = useService(CoreStart('application'));
+  // Deleting an import also deletes its connector, as the same user.
+  const canDelete =
+    useService(UserCapabilities).canWrite('alerts') && capabilities.actions?.delete === true;
 
   useDebounce(() => setSearch(searchText.trim()), SEARCH_DEBOUNCE_MS, [searchText]);
 
@@ -62,6 +68,7 @@ export const ImportsPage = () => {
         sortField={sortField}
         sortOrder={sortOrder}
         searchText={searchText}
+        canDelete={canDelete}
         onSearchChange={onSearchChange}
         onTableChange={setTableState}
       />

@@ -26,8 +26,8 @@ export const ImportsApp = () => {
   const { path } = useRouteMatch();
   const { capabilities } = useService(CoreStart('application'));
   const isEnabled = useAlertingV2ExperimentalFeatures();
-  // The list API does not read connectors, but each row's Manage action opens the import's
-  // connector, so connector read access is part of the page gate.
+  // Each import owns a connector, which is created and deleted with it, so connector access is
+  // part of the page gate.
   const canReadConnectors = capabilities.actions?.show === true;
   const pageName = i18n.translate('xpack.alertingV2.importsApp.pageName', {
     defaultMessage: 'Import alerts',

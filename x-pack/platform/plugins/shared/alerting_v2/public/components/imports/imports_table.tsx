@@ -18,7 +18,6 @@ import type { CriteriaWithPagination, EuiBasicTableColumn } from '@elastic/eui';
 import { i18n } from '@kbn/i18n';
 import type { FindImportConfigsSortField, ImportConfigType } from '@kbn/alerting-v2-schemas';
 import { ConnectorIconsMap } from '@kbn/connector-specs/icons';
-import { CoreStart, useService } from '@kbn/core-di-browser';
 import type { ImportListItem } from '../../hooks/use_fetch_imports';
 import { ImportActionsMenu } from './import_actions_menu';
 
@@ -52,9 +51,16 @@ const ImportTypeIcon = ({ connectorTypeId }: { connectorTypeId: string }) => {
   );
 };
 
-const getColumns = (
-  getConnectorUrl: (connectorId: string) => string
-): Array<EuiBasicTableColumn<ImportListItem>> => [
+const ACTIONS_COLUMN: EuiBasicTableColumn<ImportListItem> = {
+  name: i18n.translate('xpack.alertingV2.imports.list.column.actions', {
+    defaultMessage: 'Actions',
+  }),
+  align: 'right',
+  width: '8%',
+  render: ({ id, name }: ImportListItem) => <ImportActionsMenu importId={id} importName={name} />,
+};
+
+const getColumns = (canDelete: boolean): Array<EuiBasicTableColumn<ImportListItem>> => [
   {
     field: 'name',
     name: i18n.translate('xpack.alertingV2.imports.list.column.name', {
@@ -84,16 +90,7 @@ const getColumns = (
       );
     },
   },
-  {
-    name: i18n.translate('xpack.alertingV2.imports.list.column.actions', {
-      defaultMessage: 'Actions',
-    }),
-    align: 'right',
-    width: '8%',
-    render: ({ connectorId }: ImportListItem) => (
-      <ImportActionsMenu connectorId={connectorId} connectorUrl={getConnectorUrl(connectorId)} />
-    ),
-  },
+  ...(canDelete ? [ACTIONS_COLUMN] : []),
 ];
 
 const SEARCH_LABEL = i18n.translate('xpack.alertingV2.imports.list.searchPlaceholder', {
@@ -123,6 +120,8 @@ interface ImportsTableProps {
   sortField: ImportsSortField;
   sortOrder: 'asc' | 'desc';
   searchText: string;
+  /** Whether the user can delete imports, which also deletes their connectors. */
+  canDelete: boolean;
   onSearchChange: (searchText: string) => void;
   onTableChange: (change: ImportsTableChange) => void;
 }
@@ -138,20 +137,11 @@ export const ImportsTable = ({
   sortField,
   sortOrder,
   searchText,
+  canDelete,
   onSearchChange,
   onTableChange,
 }: ImportsTableProps) => {
-  const { getUrlForApp } = useService(CoreStart('application'));
-  const columns = useMemo(
-    () =>
-      getColumns((connectorId) =>
-        getUrlForApp('management', {
-          deepLinkId: 'triggersActionsConnectors',
-          path: `/connectors/${encodeURIComponent(connectorId)}`,
-        })
-      ),
-    [getUrlForApp]
-  );
+  const columns = useMemo(() => getColumns(canDelete), [canDelete]);
 
   const onChange = ({ page, sort }: CriteriaWithPagination<ImportListItem>) => {
     onTableChange({
