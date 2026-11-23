@@ -37,7 +37,7 @@ apiTest.describe('Create import config API', { tag: testData.API_ENGINE_TAG }, (
   });
 
   apiTest(
-    'should create an import and a receive-only connector for it, without returning the type',
+    'should create an import and a receive-only connector for its type',
     async ({ apiClient, apiServices }) => {
       const data = buildCreateImportConfigData();
 
@@ -49,11 +49,11 @@ apiTest.describe('Create import config API', { tag: testData.API_ENGINE_TAG }, (
       expect(response).toHaveStatusCode(201);
       expect(typeof response.body.id).toBe('string');
       expect(response.body).toMatchObject({
+        type: data.type,
         kind: data.kind,
         metadata: data.metadata,
         version: 1,
       });
-      expect(Object.keys(response.body)).not.toContain('type');
 
       expect(await apiServices.alertingV2.importConfigs.exists(response.body.id)).toBe(true);
 

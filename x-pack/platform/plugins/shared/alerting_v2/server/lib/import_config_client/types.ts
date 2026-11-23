@@ -9,6 +9,7 @@ import type {
   CreateImportConfigData,
   FindImportConfigsSortField,
   ImportConfigResponse,
+  ImportConfigType,
   PutImportConfigData,
   UpdateImportConfigData,
 } from '@kbn/alerting-v2-schemas';
@@ -35,6 +36,8 @@ export interface FindImportConfigsParams {
   sortOrder?: 'asc' | 'desc';
   /** Only returns the import configs that use this connector. */
   connectorId?: string;
+  /** Only returns the import configs that receive events from this source. */
+  type?: ImportConfigType;
 }
 
 export interface FindImportConfigsResponse {
