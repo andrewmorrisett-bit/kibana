@@ -6,9 +6,10 @@
  */
 
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { I18nProvider } from '@kbn/i18n-react';
-import { filterImportsByName, ImportsTable } from './imports_table';
+import type { ImportListItem } from '../../hooks/use_fetch_imports';
+import { ImportsTable } from './imports_table';
 
 const mockGetUrlForApp = jest.fn(
   (_appId: string, { path }: { deepLinkId: string; path: string }) =>
@@ -20,16 +21,38 @@ jest.mock('@kbn/core-di-browser', () => ({
   useService: () => ({ getUrlForApp: mockGetUrlForApp }),
 }));
 
+const ITEM: ImportListItem = {
+  id: 'import-1',
+  name: 'Datadog one',
+  type: 'datadog',
+  connectorId: 'connector/1',
+};
+
+const renderTable = (overrides: Partial<React.ComponentProps<typeof ImportsTable>> = {}) => {
+  const props: React.ComponentProps<typeof ImportsTable> = {
+    items: [ITEM],
+    totalItemCount: 1,
+    isLoading: false,
+    pageIndex: 0,
+    pageSize: 25,
+    sortField: 'name',
+    sortOrder: 'asc',
+    searchText: '',
+    onSearchChange: jest.fn(),
+    onTableChange: jest.fn(),
+    ...overrides,
+  };
+  render(
+    <I18nProvider>
+      <ImportsTable {...props} />
+    </I18nProvider>
+  );
+  return props;
+};
+
 describe('ImportsTable', () => {
   it('links the Manage action of an import to its connector', async () => {
-    render(
-      <I18nProvider>
-        <ImportsTable
-          isLoading={false}
-          items={[{ connectorId: 'connector/1', name: 'Datadog one', connectorTypeId: '.datadog' }]}
-        />
-      </I18nProvider>
-    );
+    renderTable();
 
     fireEvent.click(screen.getByTestId('importActionsButton-connector/1'));
     const manage = await screen.findByTestId('importsManageAction');
@@ -43,23 +66,37 @@ describe('ImportsTable', () => {
       path: '/connectors/connector%2F1',
     });
   });
-});
 
-describe('filterImportsByName', () => {
-  const items = [
-    { connectorId: '1', name: 'Production Datadog', connectorTypeId: '.datadog' },
-    { connectorId: '2', name: 'Staging', connectorTypeId: '.datadog' },
-  ];
+  it('shows the label of the import type', () => {
+    renderTable();
 
-  it('returns every import for a blank search', () => {
-    expect(filterImportsByName(items, '  ')).toEqual(items);
+    expect(within(screen.getByTestId('importsTable')).getByText('Datadog')).toBeInTheDocument();
   });
 
-  it('matches the name case-insensitively', () => {
-    expect(filterImportsByName(items, 'PROD')).toEqual([items[0]]);
+  it('reports the search text as it is typed', () => {
+    const { onSearchChange } = renderTable();
+
+    fireEvent.change(screen.getByTestId('importsListSearch'), { target: { value: 'prod' } });
+
+    expect(onSearchChange).toHaveBeenCalledWith('prod');
   });
 
-  it('does not match on the type', () => {
-    expect(filterImportsByName(items, 'datadog')).toEqual([items[0]]);
+  it('asks for the type sort when the Type header is clicked', () => {
+    const { onTableChange } = renderTable();
+
+    fireEvent.click(screen.getByRole('button', { name: /Type/ }));
+
+    expect(onTableChange).toHaveBeenCalledWith({
+      pageIndex: 0,
+      pageSize: 25,
+      sortField: 'type',
+      sortOrder: 'asc',
+    });
+  });
+
+  it('shows the no-matches message when a search finds nothing', () => {
+    renderTable({ items: [], totalItemCount: 0, searchText: 'nothing' });
+
+    expect(screen.getByText('No imports match your search.')).toBeInTheDocument();
   });
 });
