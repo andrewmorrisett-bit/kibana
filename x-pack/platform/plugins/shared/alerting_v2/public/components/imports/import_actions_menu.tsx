@@ -103,7 +103,7 @@ export const ImportActionsMenu = ({ importId, importName }: ImportActionsMenuPro
         >
           <FormattedMessage
             id="xpack.alertingV2.imports.deleteModal.body"
-            defaultMessage="Delete {importName}? Its connector is deleted too, and it stops receiving alerts. This action cannot be undone."
+            defaultMessage="Delete {importName}? The associated connector is deleted too, and it stops receiving alerts. This action cannot be undone."
             values={{ importName: <strong>{importName}</strong> }}
           />
         </EuiConfirmModal>
