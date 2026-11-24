@@ -31,7 +31,8 @@ import { useProfileAccessor } from '../../../../context_awareness';
 import { useDiscoverCustomization } from '../../../../customizations';
 import { useDiscoverServices } from '../../../../hooks/use_discover_services';
 import { FetchStatus } from '../../../types';
-import { checkHitCount, sendErrorTo, sendPartialMsg } from '../../hooks/use_saved_search_messages';
+import { checkHitCount, sendErrorTo } from '../../hooks/use_saved_search_messages';
+import { useChartOutcome } from './use_chart_outcome';
 import {
   type DiscoverAppState,
   selectTabCombinedFilters,
@@ -113,22 +114,15 @@ export const useDiscoverHistogram = (
     documentsState?.fetchStatus === FetchStatus.LOADING &&
     chartLoadedFor !== getAbortController();
 
+  const reportChartOutcome = useChartOutcome({ main$, documents$, getAbortController, isEsqlMode });
+
   const onChartLoaded = useCallback(
     (fetchAbortController: AbortController | undefined) => {
-      // ignore charts of an older or aborted fetch, they must not reveal the results of the current one
-      if (
-        !fetchAbortController ||
-        fetchAbortController.signal.aborted ||
-        fetchAbortController !== getAbortController()
-      ) {
-        return;
+      if (reportChartOutcome(fetchAbortController, 'loaded')) {
+        setChartLoadedFor(fetchAbortController);
       }
-
-      setChartLoadedFor(fetchAbortController);
-      // dismiss the loading overlay while documents continue loading
-      sendPartialMsg(main$);
     },
-    [getAbortController, main$]
+    [reportChartOutcome]
   );
 
   /**
@@ -199,6 +193,11 @@ export const useDiscoverHistogram = (
             result > 0
           ) {
             onChartLoaded(previousFetchParamsRef.current?.abortController);
+          } else if (
+            status === UnifiedHistogramFetchStatus.complete ||
+            status === UnifiedHistogramFetchStatus.error
+          ) {
+            reportChartOutcome(previousFetchParamsRef.current?.abortController, 'empty');
           }
           return;
         }
@@ -250,6 +249,7 @@ export const useDiscoverHistogram = (
     setTotalHitsError,
     unifiedHistogramApi?.state$,
     onChartLoaded,
+    reportChartOutcome,
   ]);
 
   /**
@@ -390,6 +390,11 @@ export const useDiscoverHistogram = (
       nextVisContext: UnifiedHistogramVisContext | undefined,
       externalVisContextStatus: UnifiedHistogramExternalVisContextStatus
     ) => {
+      if (!nextVisContext) {
+        // no chart for this query (e.g. no time field), it never reports back
+        reportChartOutcome(getAbortController(), 'empty');
+      }
+
       switch (externalVisContextStatus) {
         case UnifiedHistogramExternalVisContextStatus.manuallyCustomized:
           // if user customized the visualization manually
@@ -433,7 +438,13 @@ export const useDiscoverHistogram = (
           break;
       }
     },
-    [dispatch, setOverriddenVisContextAfterInvalidation, updateAttributes]
+    [
+      dispatch,
+      setOverriddenVisContextAfterInvalidation,
+      updateAttributes,
+      getAbortController,
+      reportChartOutcome,
+    ]
   );
 
   const onBreakdownFieldChange = useCallback<

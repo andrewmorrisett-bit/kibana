@@ -132,6 +132,11 @@ export type ChartSectionConfiguration<T extends object = object> =
        */
       replaceDefaultChart: true;
       /**
+       * Set if the section calls `onChartLoaded` once it shows results, so it can stay visible
+       * when the documents fail. Otherwise a documents error is shown full page.
+       */
+      reportsChartLoaded?: boolean;
+      /**
        * Prefix for the local storage key used to store the chart section state, when not set, it will use the default Discover key
        */
       localStorageKeyPrefix?: string;

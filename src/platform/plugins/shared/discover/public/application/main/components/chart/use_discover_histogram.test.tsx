@@ -24,7 +24,10 @@ import type {
   UnifiedHistogramVisContext,
 } from '@kbn/unified-histogram';
 import { UnifiedHistogramSuggestionType } from '@kbn/unified-histogram/types';
-import { UnifiedHistogramFetchStatus } from '@kbn/unified-histogram';
+import {
+  UnifiedHistogramExternalVisContextStatus,
+  UnifiedHistogramFetchStatus,
+} from '@kbn/unified-histogram';
 import { createMockUnifiedHistogramApi } from '@kbn/unified-histogram/mocks';
 import { checkHitCount, sendErrorTo } from '../../hooks/use_saved_search_messages';
 import type { UnifiedHistogramCustomization } from '../../../../customizations/customization_types/histogram_customization';
@@ -40,7 +43,10 @@ import { createMockEsqlSource } from '@kbn/data-source/src/__mocks__/esql_source
 import type { DataTableRecord } from '@kbn/discover-utils';
 import { DiscoverToolkitTestProvider } from '../../../../__mocks__/test_provider';
 import type { TypedLensByValueInput } from '@kbn/lens-plugin/public';
-import type { DiscoverLatestFetchDetails } from '../../state_management/discover_data_state_container';
+import type {
+  DataDocuments$,
+  DiscoverLatestFetchDetails,
+} from '../../state_management/discover_data_state_container';
 
 const mockData = dataPluginMock.createStartContract();
 let mockQueryState = {
@@ -564,7 +570,7 @@ describe('useDiscoverHistogram', () => {
         });
       };
 
-      return { hook, main$, totalHits$, fetchAbortController, setChartState };
+      return { hook, main$, documents$, totalHits$, fetchAbortController, setChartState };
     };
 
     it('should set main$ to PARTIAL and stop the chart loading when the chart completes with results', async () => {
@@ -598,6 +604,56 @@ describe('useDiscoverHistogram', () => {
       setChartState(UnifiedHistogramFetchStatus.error, new Error('test'));
       expect(main$.getValue().fetchStatus).toBe(FetchStatus.LOADING);
       expect(totalHits$.getValue()).toEqual({ fetchStatus: FetchStatus.LOADING });
+    });
+
+    describe('documents failed while the chart is pending', () => {
+      const documentsError = new Error('documents failed');
+      const failDocuments = (documents$: DataDocuments$) =>
+        act(() => {
+          documents$.next({ fetchStatus: FetchStatus.ERROR, error: documentsError });
+        });
+
+      it('should show the chart if it completes with results afterwards', async () => {
+        const { main$, documents$, setChartState } = await setupEsqlChart();
+        failDocuments(documents$);
+        setChartState(UnifiedHistogramFetchStatus.complete, 5);
+        expect(main$.getValue().fetchStatus).toBe(FetchStatus.COMPLETE);
+      });
+
+      it('should set main$ to ERROR if the chart completes without results afterwards', async () => {
+        const { main$, documents$, setChartState } = await setupEsqlChart();
+        failDocuments(documents$);
+        expect(main$.getValue().fetchStatus).toBe(FetchStatus.LOADING);
+        setChartState(UnifiedHistogramFetchStatus.complete, 0);
+        expect(main$.getValue()).toEqual({ fetchStatus: FetchStatus.ERROR, error: documentsError });
+      });
+
+      it('should set main$ to ERROR if the chart failed afterwards', async () => {
+        const { main$, documents$, setChartState } = await setupEsqlChart();
+        failDocuments(documents$);
+        setChartState(UnifiedHistogramFetchStatus.error, new Error('chart failed'));
+        expect(main$.getValue()).toEqual({ fetchStatus: FetchStatus.ERROR, error: documentsError });
+      });
+
+      it('should set main$ to ERROR if there is no chart for the query', async () => {
+        const { hook, main$, documents$ } = await setupEsqlChart();
+        failDocuments(documents$);
+        expect(main$.getValue().fetchStatus).toBe(FetchStatus.LOADING);
+        act(() => {
+          hook.result.current.onVisContextChanged?.(
+            undefined,
+            UnifiedHistogramExternalVisContextStatus.unknown
+          );
+        });
+        expect(main$.getValue()).toEqual({ fetchStatus: FetchStatus.ERROR, error: documentsError });
+      });
+
+      it('should set main$ to ERROR if the chart was already empty', async () => {
+        const { main$, documents$, setChartState } = await setupEsqlChart();
+        setChartState(UnifiedHistogramFetchStatus.complete, 0);
+        failDocuments(documents$);
+        expect(main$.getValue()).toEqual({ fetchStatus: FetchStatus.ERROR, error: documentsError });
+      });
     });
 
     it('should not change main$ if it is already in an ERROR state', async () => {

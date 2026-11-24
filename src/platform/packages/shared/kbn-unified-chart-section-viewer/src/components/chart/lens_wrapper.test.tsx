@@ -368,12 +368,24 @@ describe('LensWrapper', () => {
       expect(onChartLoaded).toHaveBeenCalledTimes(1);
     });
 
-    it('does not report a chart which finished loading without data', () => {
+    it('reports a chart when only one of several layers has data', () => {
       const onChartLoaded = jest.fn();
       const onLoad = renderWithOnChartLoaded(onChartLoaded);
 
-      onLoad(false, tablesWithoutRows);
-      onLoad(false, undefined);
+      onLoad(false, {
+        tables: { tables: { layer1: { rows: [] }, layer2: { rows: [{ a: 1 }] } } },
+      });
+      expect(onChartLoaded).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['tables without rows', tablesWithoutRows],
+      ['no adapters', undefined],
+    ])('does not report a chart which finished loading with %s', (_, adapters) => {
+      const onChartLoaded = jest.fn();
+      const onLoad = renderWithOnChartLoaded(onChartLoaded);
+
+      onLoad(false, adapters);
       expect(onChartLoaded).not.toHaveBeenCalled();
     });
 
