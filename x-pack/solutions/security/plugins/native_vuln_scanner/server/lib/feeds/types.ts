@@ -82,6 +82,8 @@ export interface AdvisoryRecord {
   fixed_version?: { raw: string; scheme: VersionScheme; key?: string };
   /** The vendor has not fixed this yet; the record matches any installed version. */
   unfixed?: true;
+  /** The fix ships only through Ubuntu Pro (ESM): `esm-infra` (main) or `esm-apps` (universe). */
+  requires_pro?: 'esm-infra' | 'esm-apps';
   /** The vendor's own wording, e.g. "Fix deferred" or "might be affected". */
   vendor_reason?: string;
   cves: AdvisoryCve[];

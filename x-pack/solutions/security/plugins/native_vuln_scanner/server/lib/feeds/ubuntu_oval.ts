@@ -36,7 +36,13 @@ import type { AdvisoryCve, AdvisoryRecord, FeedParseResult, KnowledgeEntry } fro
  */
 
 type UbuntuLeaf =
-  | { type: 'package'; source: string; testRef: string; unfixed?: true }
+  | {
+      type: 'package';
+      source: string;
+      testRef: string;
+      unfixed?: true;
+      pro?: 'esm-infra' | 'esm-apps';
+    }
   | { type: 'kernel'; flavour: string; testRef: string }
   | { type: 'kernel_presence'; flavour: string; testRef: string };
 
@@ -111,11 +117,19 @@ export interface ParseUbuntuOvalOptions {
   release: string;
   /** Parse "might be affected" and kernel-flavour-only criteria into unfixed records. */
   includeUnfixed?: boolean;
+  /**
+   * Also parse fixes published only in the Ubuntu Pro pockets (`esm-infra/<release>`,
+   * `esm-apps/<release>`). Such records carry `requires_pro`. Off by default: a release whose
+   * standard support has ended (focal, bionic) then reports no user-space findings at all.
+   */
+  includeEsm?: boolean;
 }
+
+const ESM_POCKET = /^(esm-infra|esm-apps)\/(.+)$/;
 
 export const parseUbuntuOval = async (
   input: OvalInput,
-  { release, includeUnfixed }: ParseUbuntuOvalOptions
+  { release, includeUnfixed, includeEsm }: ParseUbuntuOvalOptions
 ): Promise<FeedParseResult> => {
   const skipped: Record<string, number> = {};
   const pending: PendingDefinition[] = [];
@@ -148,9 +162,20 @@ export const parseUbuntuOval = async (
   ): Atom<UbuntuLeaf, UbuntuCondition> => {
     const fixed = comment.match(FIXED_PACKAGE);
     if (fixed) {
-      if (fixed[2] !== release) return { kind: 'false', reason: 'other_pocket' };
+      const esm = fixed[2].match(ESM_POCKET);
+      if (fixed[2] !== release && !(includeEsm && esm && esm[2] === release)) {
+        return { kind: 'false', reason: 'other_pocket' };
+      }
       if (!testRef) return { kind: 'false', reason: 'missing_test_ref' };
-      return { kind: 'leaf', leaf: { type: 'package', source: fixed[1], testRef } };
+      return {
+        kind: 'leaf',
+        leaf: {
+          type: 'package',
+          source: fixed[1],
+          testRef,
+          ...(esm && fixed[2] !== release ? { pro: esm[1] as 'esm-infra' | 'esm-apps' } : {}),
+        },
+      };
     }
     if (MIGHT_BE_AFFECTED.test(comment)) {
       const might = comment.match(MIGHT_BE_AFFECTED);
@@ -221,7 +246,10 @@ export const parseUbuntuOval = async (
             (atom) => atom.kind === 'condition' && claimableKernelRefs.has(atom.condition.testRef)
           )
       ),
-      (leaf) => leaf.testRef,
+      // Canonical reuses one fixed-version test for several kernel flavours (linux-azure-6.8 and
+      // linux-gcp-6.8 share a test when their fixed ABI is equal); keying on the test alone would
+      // merge them under whichever flavour comes first and label a gcp finding as azure.
+      (leaf) => (leaf.type === 'kernel' ? `${leaf.testRef}|${leaf.flavour}` : leaf.testRef),
       (reason) => countInto(skipped, reason === 'no_leaf' ? 'unfixed_kernel' : reason)
     );
     if (includeUnfixed) {
@@ -485,6 +513,7 @@ export const parseUbuntuOval = async (
         kind: leaf.type === 'package' ? 'package' : 'running_kernel',
         package: packageField,
         fixed_version: { raw: fixed, scheme: 'dpkg', key },
+        ...(leaf.type === 'package' && leaf.pro ? { requires_pro: leaf.pro } : {}),
         cves: [def.cve],
         conditions: resolvedConditions.map((alternative) =>
           alternative.map((c) => ({

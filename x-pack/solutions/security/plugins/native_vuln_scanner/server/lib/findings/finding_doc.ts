@@ -110,6 +110,7 @@ export interface FindingDoc {
     advisories: FindingDocAdvisory[];
     /** Set while the vendor has not fixed the CVE; such findings never alert. */
     unfixed?: boolean;
+    requires_pro?: 'esm-infra' | 'esm-apps';
     vendor_reason?: string;
     /** Windows findings only; the KB of the update that clears the CVE. */
     remediation_kb?: string;
@@ -346,6 +347,7 @@ export const toFindingDoc = (
       ...(finding.feedSnapshotTime ? { feed_snapshot_time: finding.feedSnapshotTime } : {}),
       ...(pkg.source ? { source_package: pkg.source } : {}),
       ...(finding.unfixed ? { unfixed: true } : {}),
+      ...(finding.requiresPro ? { requires_pro: finding.requiresPro } : {}),
       ...(finding.vendorReason ? { vendor_reason: finding.vendorReason } : {}),
       advisories: advisories.map(toDocAdvisory),
       ...(finding.windows

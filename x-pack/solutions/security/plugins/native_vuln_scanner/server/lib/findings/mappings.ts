@@ -78,7 +78,7 @@ export const findingsMappings: MappingTypeMapping = {
         ...keywords('source_package', 'vendor_reason', 'knowledge_id'),
         ...keywords('remediation_kb', 'superseded_kbs', 'installed_kbs', 'fixed_build'),
         ...keywords('installed_build'),
-        ...keywords('msrc_product_id', 'remediation_kind'),
+        ...keywords('msrc_product_id', 'remediation_kind', 'requires_pro'),
         unfixed: { type: 'boolean' },
         why: { type: 'text' },
         first_seen: date,

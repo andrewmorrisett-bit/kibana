@@ -235,6 +235,7 @@ const collect = (hostId: string, hits: readonly Hit[]): Finding[] => {
           ...(record.unfixed
             ? { unfixed: true as const, vendorReason: record.vendor_reason }
             : { fixedVersion: record.fixed_version?.raw }),
+          ...(record.requires_pro ? { requiresPro: record.requires_pro } : {}),
           scheme: record.fixed_version?.scheme ?? (record.os.family === 'ubuntu' ? 'dpkg' : 'rpm'),
           advisories: [advisory],
           why,

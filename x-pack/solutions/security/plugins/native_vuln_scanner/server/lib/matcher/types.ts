@@ -79,6 +79,8 @@ export interface Finding {
   fixedVersion?: string;
   /** The vendor has not fixed this yet; set instead of `fixedVersion`. */
   unfixed?: true;
+  /** The fix ships only through Ubuntu Pro (ESM); an unattached host cannot install it. */
+  requiresPro?: 'esm-infra' | 'esm-apps';
   /** The vendor's own wording, e.g. "Fix deferred" or "might be affected". */
   vendorReason?: string;
   scheme: VersionScheme;
